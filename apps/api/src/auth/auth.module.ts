@@ -27,6 +27,7 @@ import { IdentityFlowService } from './identity-flow.service.js';
       useFactory: () => new PasswordService(parseRuntimeEnv().argon2),
     },
   ],
-  exports: [AuthService, AuthRepository, PasswordService, TokenService, IdentityFlowService],
+  exports: [AuthService, AuthRepository, PasswordService, TokenService, IdentityFlowService, AuthGuard],
 })
 export class AuthModule {}
+
