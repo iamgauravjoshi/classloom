@@ -45,6 +45,15 @@ describe('tenant schema', () => {
     }
   });
 
+  it('defines the composite campus key needed by future tenant-owned references', () => {
+    const campusConfig = getTableConfig(schema.campuses);
+    const campusKey = campusConfig.indexes.find((index) => index.config.name === 'campuses_tenant_id_id_unique');
+
+    expect(campusKey).toBeDefined();
+    expect(campusKey?.config.columns.map((column) => 'name' in column ? column.name : undefined))
+      .toEqual(['tenant_id', 'id']);
+  });
+
   it.skipIf(!process.env.DATABASE_MIGRATION_URL)(
     'migrates forced RLS policies for schools and campuses',
     async () => {

@@ -1,9 +1,12 @@
 import { randomUUID } from 'node:crypto';
+import { eq } from 'drizzle-orm';
 import postgres from 'postgres';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDb } from './client.js';
 import { parseProvisionTenantArgs } from './provision-tenant.js';
 import { provisionTenant, ProvisioningConflictError } from './provisioning.js';
+import { schools } from './schema.js';
+import { withTenantContext } from './tenant-context.js';
 
 const provisionerUrl = process.env.DATABASE_PROVISIONER_URL;
 const integrationEnabled = Boolean(provisionerUrl);
@@ -95,14 +98,17 @@ describe.skipIf(!integrationEnabled)('provisionTenant', () => {
     createdSlugs.push(input.tenantSlug);
     const result = await provisionTenant(db.db, input);
 
-    await expect(admin`
-      insert into schools (tenant_id, name, code, timezone, currency)
-      values (${result.tenant.id}, 'Duplicate school', ${input.schoolCode}, ${input.timezone}, ${input.currency})
-    `).rejects.toMatchObject({ code: '23505' });
+    await expect(withTenantContext(db.db, result.tenant.id, (tx) => tx.insert(schools).values({
+      tenantId: result.tenant.id,
+      name: 'Duplicate school',
+      code: input.schoolCode,
+      timezone: input.timezone,
+      currency: input.currency,
+    }))).rejects.toMatchObject({ cause: { code: '23505' } });
 
-    const rows = await admin<{ id: string }[]>`
-      select id from schools where tenant_id = ${result.tenant.id} and code = ${input.schoolCode}
-    `;
+    const rows = await withTenantContext(db.db, result.tenant.id, (tx) =>
+      tx.select({ id: schools.id }).from(schools).where(eq(schools.code, input.schoolCode)),
+    );
     expect(rows).toHaveLength(1);
   });
 

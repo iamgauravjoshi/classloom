@@ -67,6 +67,7 @@ export const campuses = pgTable('campuses', {
     name: 'campuses_tenant_school_fk',
   }).onDelete('cascade'),
   uniqueIndex('campuses_tenant_school_id_unique').on(table.tenantId, table.schoolId, table.id),
+  uniqueIndex('campuses_tenant_id_id_unique').on(table.tenantId, table.id),
   uniqueIndex('campuses_school_code_unique').on(table.tenantId, table.schoolId, table.code),
   pgPolicy('campuses_tenant_isolation', {
     for: 'all',

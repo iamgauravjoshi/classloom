@@ -89,6 +89,43 @@ describe('withTenantContext', () => {
       );
       await expect(insertOther).rejects.toMatchObject({ cause: { code: '42501' } });
 
+      const updateCampusTenantId = withTenantContext(runtime!.db, fixture.tenantA, (tx) =>
+        tx.update(campuses).set({ tenantId: fixture.tenantB })
+          .where(eq(campuses.id, fixture.campusA)).returning(),
+      );
+      await expect(updateCampusTenantId).rejects.toMatchObject({ cause: { code: '42501' } });
+
+      const insertOtherCampus = withTenantContext(runtime!.db, fixture.tenantA, (tx) =>
+        tx.insert(campuses).values({
+          tenantId: fixture.tenantB,
+          schoolId: fixture.schoolB,
+          name: 'forged campus',
+          code: `FORGED-CAMPUS-${fixture.suffix}`,
+        }),
+      );
+      await expect(insertOtherCampus).rejects.toMatchObject({ cause: { code: '42501' } });
+
+      const insertedSchool = await withTenantContext(runtime!.db, fixture.tenantA, (tx) =>
+        tx.insert(schools).values({
+          tenantId: fixture.tenantA,
+          name: 'Runtime inserted school',
+          code: `RUNTIME-${fixture.suffix}`,
+          timezone: 'Asia/Kolkata',
+          currency: 'INR',
+        }).returning({ id: schools.id }),
+      );
+      expect(insertedSchool).toHaveLength(1);
+
+      const insertedCampus = await withTenantContext(runtime!.db, fixture.tenantA, (tx) =>
+        tx.insert(campuses).values({
+          tenantId: fixture.tenantA,
+          schoolId: fixture.schoolA,
+          name: 'Runtime inserted campus',
+          code: `RUNTIME-CAMPUS-${fixture.suffix}`,
+        }).returning({ id: campuses.id }),
+      );
+      expect(insertedCampus).toHaveLength(1);
+
       const ownUpdate = await withTenantContext(runtime!.db, fixture.tenantA, (tx) =>
         tx.update(schools).set({ name: 'Tenant A school updated' })
           .where(eq(schools.id, fixture.schoolA)).returning({ name: schools.name }),
@@ -117,6 +154,13 @@ describe('withTenantContext', () => {
         code: `UNSCOPED-${fixture.suffix}`,
         timezone: 'Asia/Kolkata',
         currency: 'INR',
+      })).rejects.toMatchObject({ cause: { code: '42501' } });
+
+      await expect(runtime!.db.insert(campuses).values({
+        tenantId: fixture.tenantA,
+        schoolId: fixture.schoolA,
+        name: 'unscoped campus',
+        code: `UNSCOPED-CAMPUS-${fixture.suffix}`,
       })).rejects.toMatchObject({ cause: { code: '42501' } });
     },
   );
@@ -147,13 +191,35 @@ describe('withTenantContext', () => {
 });
 
 let admin: ReturnType<typeof postgres> | undefined;
+let runtimeVerifier: ReturnType<typeof postgres> | undefined;
 let runtime: ReturnType<typeof createDb> | undefined;
 const fixtures: Array<{ tenantA: string; tenantB: string }> = [];
 
 beforeAll(async () => {
   if (!integrationEnabled) return;
   admin = postgres(adminUrl!, { max: 1 });
+  runtimeVerifier = postgres(databaseUrl!, { max: 1 });
   runtime = createDb(databaseUrl!, { maxConnections: 1 });
+});
+
+it.skipIf(!integrationEnabled)('connects through a non-owner runtime role', async () => {
+  const [role] = await runtimeVerifier!<{ role: string; superuser: boolean; bypass_rls: boolean; owns_tenant_tables: boolean }[]>`
+    select r.rolname as role,
+      r.rolsuper as superuser,
+      r.rolbypassrls as bypass_rls,
+      exists (
+        select 1 from pg_class c
+        join pg_namespace n on n.oid = c.relnamespace
+        where n.nspname = current_schema()
+          and c.relname in ('schools', 'campuses')
+          and c.relowner = r.oid
+      ) as owns_tenant_tables
+    from pg_roles r
+    where r.rolname = current_user
+  `;
+
+  expect(role).toBeDefined();
+  expect(role).toMatchObject({ superuser: false, bypass_rls: false, owns_tenant_tables: false });
 });
 
 afterAll(async () => {
@@ -163,6 +229,7 @@ afterAll(async () => {
     }
     await admin.end();
   }
+  await runtimeVerifier?.end();
   await runtime?.close();
 });
 
@@ -181,17 +248,36 @@ async function makeFixture() {
       (${tenantA}, 'Tenant A', ${`tenant-a-${suffix}`}),
       (${tenantB}, 'Tenant B', ${`tenant-b-${suffix}`})
   `;
-  await admin!`
-    insert into schools (id, tenant_id, name, code, timezone, currency) values
-      (${schoolA}, ${tenantA}, 'School A', ${`SCHOOL-A-${suffix}`}, 'Asia/Kolkata', 'INR'),
-      (${schoolB}, ${tenantB}, 'School B', ${`SCHOOL-B-${suffix}`}, 'Asia/Kolkata', 'INR')
-  `;
-
-  await admin!`
-    insert into campuses (id, tenant_id, school_id, name, code) values
-      (${campusA}, ${tenantA}, ${schoolA}, 'Campus A', ${`CAMPUS-A-${suffix}`}),
-      (${campusB}, ${tenantB}, ${schoolB}, 'Campus B', ${`CAMPUS-B-${suffix}`})
-  `;
+  await withTenantContext(runtime!.db, tenantA, (tx) => tx.insert(schools).values({
+    id: schoolA,
+    tenantId: tenantA,
+    name: 'School A',
+    code: `SCHOOL-A-${suffix}`,
+    timezone: 'Asia/Kolkata',
+    currency: 'INR',
+  }));
+  await withTenantContext(runtime!.db, tenantB, (tx) => tx.insert(schools).values({
+    id: schoolB,
+    tenantId: tenantB,
+    name: 'School B',
+    code: `SCHOOL-B-${suffix}`,
+    timezone: 'Asia/Kolkata',
+    currency: 'INR',
+  }));
+  await withTenantContext(runtime!.db, tenantA, (tx) => tx.insert(campuses).values({
+    id: campusA,
+    tenantId: tenantA,
+    schoolId: schoolA,
+    name: 'Campus A',
+    code: `CAMPUS-A-${suffix}`,
+  }));
+  await withTenantContext(runtime!.db, tenantB, (tx) => tx.insert(campuses).values({
+    id: campusB,
+    tenantId: tenantB,
+    schoolId: schoolB,
+    name: 'Campus B',
+    code: `CAMPUS-B-${suffix}`,
+  }));
 
   return { tenantA, tenantB, schoolA, schoolB, campusA, campusB, suffix };
 }

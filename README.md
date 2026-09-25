@@ -13,14 +13,15 @@ School management SaaS for Indian schools. This repository currently contains th
 1. `pnpm install`
 2. Copy `.env.example` to `.env` and keep the development values or set local equivalents.
 3. `docker compose up -d db`
-4. `pnpm db:migrate`
-5. `pnpm dev`
+4. `pnpm db:setup-runtime-role`
+5. `pnpm db:migrate`
+6. `pnpm dev`
 
 Open the web app at `http://localhost:3000`. The API health endpoint is `http://localhost:4000/api/v1/health` and API docs are at `http://localhost:4000/api/docs`.
 
 ## Checks
 
-Run `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `pnpm build`. `pnpm db:check` tests database connectivity using `DATABASE_URL`.
+Run `pnpm lint`, `pnpm typecheck`, `pnpm build`, and `pnpm exec dotenv -e .env -- pnpm test` to include PostgreSQL integration tests. `pnpm test` alone runs without loading `.env`, so database integration tests are skipped. `pnpm db:check` tests database connectivity using `DATABASE_URL`.
 
 ## Project layout
 
