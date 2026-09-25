@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import {
   createSession,
   createSessionIfPasswordHashUnchanged,
@@ -26,7 +26,7 @@ import { DatabaseService } from '../database/database.service.js';
 
 @Injectable()
 export class AuthRepository {
-  constructor(private readonly database: DatabaseService) {}
+  constructor(@Inject(DatabaseService) private readonly database: DatabaseService) {}
 
   findAccountCredentialByEmail(email: string) {
     return findAccountCredentialByEmail(this.database.db, normalizeEmailAddress(email));

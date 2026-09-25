@@ -6,9 +6,10 @@ import { HttpExceptionEnvelopeFilter } from './common/http-exception.filter.js';
 import { DatabaseModule } from './database/database.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { AuthorizationModule } from './authorization/authorization.module.js';
+import { AcademicsModule } from './academics/academics.module.js';
 
 @Module({
-  imports: [DatabaseModule, AuthModule, AuthorizationModule],
+  imports: [DatabaseModule, AuthModule, AuthorizationModule, AcademicsModule],
   controllers: [HealthController],
   providers: [{ provide: APP_FILTER, useClass: HttpExceptionEnvelopeFilter }],
 })

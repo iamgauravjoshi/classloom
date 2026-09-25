@@ -5,6 +5,11 @@ export type { ProvisionTenantInput } from './provisioning.js';
 export {
   accountCredentials,
   accounts,
+  academicClasses,
+  academicSections,
+  academicSessions,
+  academicSubjects,
+  academicTeacherAssignments,
   authorizationRolePermissions,
   authorizationRoles,
   appMetadata,
@@ -21,6 +26,7 @@ export {
   tenants,
 } from './schema.js';
 export { withTenantContext } from './tenant-context.js';
+export { AcademicSetupError, validateAcademicCode, validateAcademicSession, listAcademicSchools, listActiveAcademicMembers, readAcademicSetup, createAcademicSession, createAcademicClass, createAcademicSection, createAcademicSubject, createAcademicAssignment, activateAcademicSession } from './academics.js';
 export { withAccountContext } from './account-context.js';
 export { seedTenantAuthorization } from './authorization-seeding.js';
 export { PERMISSION_CATALOG, BUILT_IN_ROLE_TEMPLATES } from './authorization-catalog.js';

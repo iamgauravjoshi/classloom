@@ -2,6 +2,7 @@
 
 import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   Bell,
   BookOpen,
@@ -58,6 +59,7 @@ function Brand() {
 }
 
 function SidebarContents({ onNavigate }: { onNavigate?: () => void }) {
+  const pathname = usePathname();
   return (
     <>
       <div className="sidebar-brand">
@@ -68,8 +70,8 @@ function SidebarContents({ onNavigate }: { onNavigate?: () => void }) {
           <School size={19} />
         </span>
         <span className="workspace-name">
-          <strong>ClassLoom Demo</strong>
-          <small>Sample workspace</small>
+          <strong>ClassLoom</strong>
+          <small>School workspace</small>
         </span>
         <ChevronDown size={15} />
       </div>
@@ -77,18 +79,20 @@ function SidebarContents({ onNavigate }: { onNavigate?: () => void }) {
         <p className="nav-caption">MAIN MENU</p>
         <Link
           href="/"
-          className="nav-row nav-row-active"
-          aria-current="page"
+          className={`nav-row ${pathname === "/" || pathname === "/dashboard" ? "nav-row-active" : ""}`}
+          aria-current={pathname === "/" || pathname === "/dashboard" ? "page" : undefined}
           onClick={onNavigate}
         >
           <LayoutDashboard size={18} />
           <span>Dashboard</span>
           <ChevronRight className="nav-chevron" size={16} />
         </Link>
-        <p className="nav-caption nav-caption-spaced">
-          SCHOOL MANAGEMENT <span className="preview-label">SOON</span>
-        </p>
-        {upcomingSections.map((section) => {
+        <p className="nav-caption nav-caption-spaced">ACADEMIC</p>
+        <Link href="/academic-setup" className={`nav-row ${pathname === "/academic-setup" ? "nav-row-active" : ""}`} aria-current={pathname === "/academic-setup" ? "page" : undefined} onClick={onNavigate}>
+          <School size={18} /><span>Academic Setup</span><ChevronRight className="nav-chevron" size={16} />
+        </Link>
+        <p className="nav-caption nav-caption-spaced">SCHOOL MANAGEMENT <span className="preview-label">SOON</span></p>
+        {upcomingSections.filter((section) => section.icon !== "classes").map((section) => {
           const Icon = sectionIcons[section.icon];
           return (
             <div
@@ -119,7 +123,7 @@ function SidebarContents({ onNavigate }: { onNavigate?: () => void }) {
         </div>
         <div>
           <strong>Built for every school</strong>
-          <small>Phase 0 preview</small>
+          <small>School management</small>
         </div>
       </div>
     </>

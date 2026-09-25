@@ -1,4 +1,4 @@
-import { CanActivate, ForbiddenException, Injectable } from '@nestjs/common';
+import { CanActivate, ForbiddenException, Inject, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { ExecutionContext } from '@nestjs/common';
 import type { PermissionKey } from '@classloom/db';
@@ -8,7 +8,7 @@ import { AuthorizationService } from './authorization.service.js';
 
 @Injectable()
 export class AuthorizationGuard implements CanActivate {
-  constructor(private readonly reflector: Reflector, private readonly authorization: AuthorizationService) {}
+  constructor(@Inject(Reflector) private readonly reflector: Reflector, @Inject(AuthorizationService) private readonly authorization: AuthorizationService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const required = this.reflector.getAllAndOverride<PermissionKey[] | undefined>(REQUIRED_PERMISSIONS_METADATA, [

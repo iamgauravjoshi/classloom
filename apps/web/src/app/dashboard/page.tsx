@@ -109,10 +109,10 @@ export default async function Home() {
           <strong>Welcome to your ClassLoom preview</strong>
           <p>
             The figures below are sample data to demonstrate the dashboard
-            layout. School workflows arrive in later phases.
+            layout. Academic setup is now available from the sidebar.
           </p>
         </div>
-        <Badge variant="secondary">PHASE 2</Badge>
+        <Badge variant="secondary">PHASE 4</Badge>
       </div>
       <section className="metrics-grid" aria-label="Sample school metrics">
         {metrics.map((metric) => (

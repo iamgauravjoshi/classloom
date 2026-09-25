@@ -12,10 +12,10 @@ import { EmailService } from './email.service.js';
 @Injectable()
 export class IdentityFlowService {
   constructor(
-    private readonly repository: AuthRepository,
-    private readonly passwords: PasswordService,
-    private readonly tokens: TokenService,
-    private readonly email: EmailService,
+    @Inject(AuthRepository) private readonly repository: AuthRepository,
+    @Inject(PasswordService) private readonly passwords: PasswordService,
+    @Inject(TokenService) private readonly tokens: TokenService,
+    @Inject(EmailService) private readonly email: EmailService,
     @Inject(AUTH_CONFIG) private readonly config: AuthConfiguration,
   ) {}
 

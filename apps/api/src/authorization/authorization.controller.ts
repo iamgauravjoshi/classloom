@@ -6,6 +6,7 @@ import {
   Delete,
   ForbiddenException,
   Get,
+  Inject,
   NotFoundException,
   Param,
   Post,
@@ -74,7 +75,7 @@ function mapRepositoryError(error: unknown): never {
 @Controller('authorization')
 @UseGuards(AuthGuard, CsrfGuard, AuthorizationGuard)
 export class AuthorizationController {
-  constructor(private readonly database: DatabaseService) {}
+  constructor(@Inject(DatabaseService) private readonly database: DatabaseService) {}
 
   @Get('permissions')
   @RequirePermissions('authorization.roles.read')

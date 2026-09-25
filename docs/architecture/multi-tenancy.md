@@ -12,5 +12,7 @@ To create the first tenant and school in a local environment, run `pnpm db:provi
 
 Every future tenant-owned module must add a non-null `tenant_id`, tenant-safe composite foreign keys, tenant-scoped repositories, and an RLS policy. Isolation tests must cover two tenants, direct-ID access, mismatched writes, absent context, and pooled-connection reuse. An ADR is required for any exception.
 
+Phase 4 academic tables follow this pattern. Sessions reference a school; classes and subjects reference a session; sections reference a class; teacher assignments reference a section, subject, and tenant membership. Composite keys include tenant, school, and session IDs so an assignment cannot combine records from different schools or sessions. The API resolves the tenant from the active server session and verifies `school.read` or `school.manage` for the requested school before accessing these tables.
+
 
 Authorization roles, role-permission mappings, and membership assignments are tenant-owned tables with forced RLS. Permission catalog reads use the global application-owned catalog; runtime writes to role data run only inside `withTenantContext`. Assignments have same-tenant composite references to memberships, roles, schools, and campuses. Tenant, school, and campus grants follow the scope hierarchy documented in [identity and access](identity-and-access.md); unsupported academic and relationship scopes fail closed.

@@ -21,9 +21,9 @@ export interface AuthenticatedSession {
 @Injectable()
 export class AuthService {
   constructor(
-    private readonly repository: AuthRepository,
-    private readonly passwords: PasswordService,
-    private readonly tokens: TokenService,
+    @Inject(AuthRepository) private readonly repository: AuthRepository,
+    @Inject(PasswordService) private readonly passwords: PasswordService,
+    @Inject(TokenService) private readonly tokens: TokenService,
     @Inject(AUTH_CONFIG) private readonly config: AuthConfiguration,
   ) {}
 

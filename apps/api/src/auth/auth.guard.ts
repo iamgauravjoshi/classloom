@@ -10,7 +10,7 @@ import { readSessionCookie } from './session-cookie.js';
 @Injectable()
 export class AuthGuard implements CanActivate {
   constructor(
-    private readonly authService: AuthService,
+    @Inject(AuthService) private readonly authService: AuthService,
     @Inject(AUTH_CONFIG) private readonly config: AuthConfiguration,
   ) {}
 

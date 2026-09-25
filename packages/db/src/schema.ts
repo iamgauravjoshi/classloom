@@ -4,6 +4,7 @@ import {
   index,
   boolean,
   check,
+  date,
   integer,
   jsonb,
   pgTable,
@@ -314,4 +315,96 @@ export const membershipRoleAssignments = pgTable('membership_role_assignments', 
     using: sql`tenant_id = nullif(current_setting('app.tenant_id', true), '')::uuid`,
     withCheck: sql`tenant_id = nullif(current_setting('app.tenant_id', true), '')::uuid`,
   }),
+]).enableRLS();
+
+const tenantPolicy = (table: { tenantId: import('drizzle-orm/pg-core').PgColumn }) => pgPolicy('tenant_isolation', {
+  for: 'all', to: 'public',
+  using: sql`${table.tenantId} = nullif(current_setting('app.tenant_id', true), '')::uuid`,
+  withCheck: sql`${table.tenantId} = nullif(current_setting('app.tenant_id', true), '')::uuid`,
+});
+
+export const academicSessions = pgTable('academic_sessions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  schoolId: uuid('school_id').notNull(),
+  name: text('name').notNull(),
+  code: text('code').notNull(),
+  startDate: date('start_date').notNull(),
+  endDate: date('end_date').notNull(),
+  status: text('status').notNull().default('draft'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.tenantId, table.schoolId], foreignColumns: [schools.tenantId, schools.id], name: 'academic_sessions_school_fk' }).onDelete('cascade'),
+  uniqueIndex('academic_sessions_tenant_school_id_unique').on(table.tenantId, table.schoolId, table.id),
+  uniqueIndex('academic_sessions_school_code_unique').on(table.tenantId, table.schoolId, table.code),
+  uniqueIndex('academic_sessions_one_active_unique').on(table.tenantId, table.schoolId).where(sql`${table.status} = 'active'`),
+  check('academic_sessions_dates_check', sql`${table.endDate} > ${table.startDate}`),
+  check('academic_sessions_status_check', sql`${table.status} in ('draft', 'active', 'archived')`),
+  tenantPolicy(table),
+]).enableRLS();
+
+export const academicClasses = pgTable('academic_classes', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  schoolId: uuid('school_id').notNull(),
+  sessionId: uuid('session_id').notNull(),
+  name: text('name').notNull(),
+  code: text('code').notNull(),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.tenantId, table.schoolId, table.sessionId], foreignColumns: [academicSessions.tenantId, academicSessions.schoolId, academicSessions.id], name: 'academic_classes_session_fk' }).onDelete('cascade'),
+  uniqueIndex('academic_classes_scope_id_unique').on(table.tenantId, table.schoolId, table.sessionId, table.id),
+  uniqueIndex('academic_classes_session_code_unique').on(table.tenantId, table.schoolId, table.sessionId, table.code),
+  tenantPolicy(table),
+]).enableRLS();
+
+export const academicSections = pgTable('academic_sections', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  schoolId: uuid('school_id').notNull(),
+  sessionId: uuid('session_id').notNull(),
+  classId: uuid('class_id').notNull(),
+  name: text('name').notNull(),
+  code: text('code').notNull(),
+  capacity: integer('capacity'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.tenantId, table.schoolId, table.sessionId, table.classId], foreignColumns: [academicClasses.tenantId, academicClasses.schoolId, academicClasses.sessionId, academicClasses.id], name: 'academic_sections_class_fk' }).onDelete('cascade'),
+  uniqueIndex('academic_sections_scope_id_unique').on(table.tenantId, table.schoolId, table.sessionId, table.id),
+  uniqueIndex('academic_sections_class_code_unique').on(table.tenantId, table.schoolId, table.sessionId, table.classId, table.code),
+  check('academic_sections_capacity_check', sql`${table.capacity} is null or ${table.capacity} > 0`),
+  tenantPolicy(table),
+]).enableRLS();
+
+export const academicSubjects = pgTable('academic_subjects', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  schoolId: uuid('school_id').notNull(),
+  sessionId: uuid('session_id').notNull(),
+  name: text('name').notNull(),
+  code: text('code').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.tenantId, table.schoolId, table.sessionId], foreignColumns: [academicSessions.tenantId, academicSessions.schoolId, academicSessions.id], name: 'academic_subjects_session_fk' }).onDelete('cascade'),
+  uniqueIndex('academic_subjects_scope_id_unique').on(table.tenantId, table.schoolId, table.sessionId, table.id),
+  uniqueIndex('academic_subjects_session_code_unique').on(table.tenantId, table.schoolId, table.sessionId, table.code),
+  tenantPolicy(table),
+]).enableRLS();
+
+export const academicTeacherAssignments = pgTable('academic_teacher_assignments', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  schoolId: uuid('school_id').notNull(),
+  sessionId: uuid('session_id').notNull(),
+  sectionId: uuid('section_id').notNull(),
+  subjectId: uuid('subject_id').notNull(),
+  membershipId: uuid('membership_id').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.tenantId, table.schoolId, table.sessionId, table.sectionId], foreignColumns: [academicSections.tenantId, academicSections.schoolId, academicSections.sessionId, academicSections.id], name: 'academic_assignments_section_fk' }).onDelete('cascade'),
+  foreignKey({ columns: [table.tenantId, table.schoolId, table.sessionId, table.subjectId], foreignColumns: [academicSubjects.tenantId, academicSubjects.schoolId, academicSubjects.sessionId, academicSubjects.id], name: 'academic_assignments_subject_fk' }).onDelete('cascade'),
+  foreignKey({ columns: [table.tenantId, table.membershipId], foreignColumns: [memberships.tenantId, memberships.id], name: 'academic_assignments_membership_fk' }).onDelete('cascade'),
+  uniqueIndex('academic_assignments_section_subject_unique').on(table.tenantId, table.schoolId, table.sessionId, table.sectionId, table.subjectId),
+  tenantPolicy(table),
 ]).enableRLS();

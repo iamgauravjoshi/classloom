@@ -9,7 +9,7 @@ if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tena
   throw new Error('tenant-id must be a UUID');
 }
 
-const app = await NestFactory.createApplicationContext(AppModule, { logger: false });
+const app = await NestFactory.createApplicationContext(AppModule, { logger: ['error'] });
 try {
   const result = await app.get(IdentityFlowService).issueInvitation(tenantId, email);
   console.log(`Invitation sent (${result.invitationId})`);

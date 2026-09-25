@@ -53,8 +53,8 @@ function cookieOptions(config: AuthConfiguration) {
 @ApiTags('Authentication')
 export class AuthController {
   constructor(
-    private readonly authService: AuthService,
-    private readonly identityFlows: IdentityFlowService,
+    @Inject(AuthService) private readonly authService: AuthService,
+    @Inject(IdentityFlowService) private readonly identityFlows: IdentityFlowService,
     @Inject(AUTH_CONFIG) private readonly config: AuthConfiguration,
   ) {}
 
