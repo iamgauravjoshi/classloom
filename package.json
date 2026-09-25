@@ -1,0 +1,24 @@
+{
+  "name": "classloom",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@11.19.0",
+  "engines": {
+    "node": ">=24.15.0"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @classloom/db build && dotenv -e .env -- pnpm --parallel --filter @classloom/web --filter @classloom/api dev",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "test:e2e": "pnpm --filter @classloom/api test:e2e",
+    "build": "pnpm -r build",
+    "db:generate": "pnpm --filter @classloom/db generate",
+    "db:migrate": "dotenv -e .env -- pnpm --filter @classloom/db migrate",
+    "db:check": "dotenv -e .env -- pnpm --filter @classloom/db check"
+  },
+  "devDependencies": {
+    "dotenv-cli": "^11.0.0",
+    "shadcn": "^4.21.0"
+  }
+}

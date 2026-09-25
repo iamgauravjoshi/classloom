@@ -1,0 +1,42 @@
+name: CI
+on:
+  push:
+  pull_request:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: classloom
+          POSTGRES_USER: classloom
+          POSTGRES_PASSWORD: classloom_dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U classloom -d classloom"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://classloom:classloom_dev@localhost:5432/classloom
+      API_PORT: 4000
+      WEB_ORIGIN: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm test:e2e
+      - run: pnpm build
+      - run: pnpm db:migrate
+      - run: pnpm db:migrate
+      - run: pnpm db:check

@@ -1,0 +1,15 @@
+node_modules/
+.pnpm-store/
+.old-node-modules*/
+.old-node_modules/
+.next/
+dist/
+coverage/
+.turbo/
+.superpowers/
+.env
+.env.*
+!.env.example
+*.tsbuildinfo
+*.log
+apps/*/pnpm-lock.yaml
