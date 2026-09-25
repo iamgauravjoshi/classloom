@@ -56,16 +56,19 @@ describe.skipIf(!provisionerUrl || !runtimeUrl)('authorization seeding', () => {
     await admin`insert into tenants (id,name,slug) values (${tenantId},'Pre-existing Tenant',${`preexisting-${tenantId}`})`;
 
     const seedMigration = readFileSync(new URL('../drizzle/0008_seed_authorization.sql', import.meta.url), 'utf8');
-    for (const statement of seedMigration.split('--> statement-breakpoint').map((part) => part.trim()).filter(Boolean)) {
-      await admin.unsafe(statement);
-    }
+    await admin.begin(async (transaction) => {
+      await transaction`lock table tenants in share row exclusive mode`;
+      for (const statement of seedMigration.split('--> statement-breakpoint').map((part) => part.trim()).filter(Boolean)) {
+        await transaction.unsafe(statement);
+      }
 
-    const roles = await admin<{ key: string }[]>`
-      select key from authorization_roles where tenant_id = ${tenantId} order by key
-    `;
-    const permissionCount = await admin<{ count: number }[]>`select count(*)::int as count from permissions`;
+      const roles = await transaction<{ key: string }[]>`
+        select key from authorization_roles where tenant_id = ${tenantId} order by key
+      `;
+      const permissionCount = await transaction<{ count: number }[]>`select count(*)::int as count from permissions`;
 
-    expect(roles.map(({ key }) => key).sort()).toEqual(BUILT_IN_ROLE_TEMPLATES.map(({ key }) => key).sort());
-    expect(permissionCount[0]!.count).toBe(PERMISSION_CATALOG.length);
+      expect(roles.map(({ key }) => key).sort()).toEqual(BUILT_IN_ROLE_TEMPLATES.map(({ key }) => key).sort());
+      expect(permissionCount[0]!.count).toBe(PERMISSION_CATALOG.length);
+    });
   });
 });
