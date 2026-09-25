@@ -20,7 +20,14 @@ export { withTenantContext } from './tenant-context.js';
 export { withAccountContext } from './account-context.js';
 export {
   createAccountWithMembership,
+  createPasswordResetToken,
+  isPasswordResetTokenValid,
+  consumePasswordResetToken,
+  consumeAuthRateLimit,
+  checkAuthRateLimit,
+  recordSecurityEvent,
   createSession,
+  createSessionIfPasswordHashUnchanged,
   findAccountCredentialByEmail,
   getSessionByTokenHash,
   listActiveMemberships,
@@ -30,3 +37,10 @@ export {
   selectSessionMembership,
   touchSession,
 } from './identity-repository.js';
+export {
+  createMembershipInvitation,
+  revokeMembershipInvitation,
+  acceptInvitationForExistingAccount,
+  acceptInvitationForNewAccount,
+  InvitationError,
+} from './invite-membership.js';

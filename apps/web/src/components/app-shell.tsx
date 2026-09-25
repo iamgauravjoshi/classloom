@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { LogoutButton } from "@/components/logout-button";
 import {
   Sheet,
   SheetContent,
@@ -152,7 +153,7 @@ function ThemeToggle() {
   );
 }
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({ children, accountName = "School account", accountEmail = "" }: { children: React.ReactNode; accountName?: string; accountEmail?: string }) {
   const [menuOpen, setMenuOpen] = useState(false);
   return (
     <div className="app-shell">
@@ -206,13 +207,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </span>
             <span className="header-divider" />
             <Avatar size="default">
-              <AvatarFallback className="profile-avatar">AD</AvatarFallback>
+              <AvatarFallback className="profile-avatar">{accountName.slice(0, 2).toUpperCase()}</AvatarFallback>
             </Avatar>
             <span className="profile-name">
-              <strong>Admin Demo</strong>
-              <small>Administrator</small>
+              <strong>{accountName}</strong>
+              <small>{accountEmail}</small>
             </span>
-            <ChevronDown size={14} className="profile-chevron" />
+            <LogoutButton />
           </div>
         </header>
         <main className="main-content">{children}</main>

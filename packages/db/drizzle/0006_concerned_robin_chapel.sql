@@ -1,0 +1,1 @@
+CREATE POLICY "invitations_token_update" ON "invitations" AS PERMISSIVE FOR UPDATE TO public USING (token_hash = current_setting('app.invitation_token_hash', true)) WITH CHECK (token_hash = current_setting('app.invitation_token_hash', true));

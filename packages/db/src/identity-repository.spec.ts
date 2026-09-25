@@ -64,6 +64,9 @@ describe('identity repository', () => {
         .resolves.toBe(false);
       await expect(selectSessionMembership(runtime!.db, accountA.id, session.id, accountA.membershipId))
         .resolves.toBe(true);
+      await expect(getSessionByTokenHash(runtime!.db, 'sha256:token-a')).resolves.toMatchObject({
+        activeMembership: { id: accountA.membershipId, accountId: accountA.id },
+      });
 
       await expect(createAccountWithMembership(runtime!.db, {
         email: `rollback-${tenantA}@example.test`,

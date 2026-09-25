@@ -162,6 +162,17 @@ export const invitations = pgTable('invitations', {
     using: sql`tenant_id = nullif(current_setting('app.tenant_id', true), '')::uuid`,
     withCheck: sql`tenant_id = nullif(current_setting('app.tenant_id', true), '')::uuid`,
   }),
+  pgPolicy('invitations_token_lookup', {
+    for: 'select',
+    to: 'public',
+    using: sql`token_hash = current_setting('app.invitation_token_hash', true)`,
+  }),
+  pgPolicy('invitations_token_update', {
+    for: 'update',
+    to: 'public',
+    using: sql`token_hash = current_setting('app.invitation_token_hash', true)`,
+    withCheck: sql`token_hash = current_setting('app.invitation_token_hash', true)`,
+  }),
 ]).enableRLS();
 
 export const passwordResetTokens = pgTable('password_reset_tokens', {

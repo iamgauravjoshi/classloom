@@ -3,9 +3,11 @@ import { APP_FILTER } from '@nestjs/core';
 import { HealthController } from './health/health.controller.js';
 import { RequestIdMiddleware } from './common/request-id.middleware.js';
 import { HttpExceptionEnvelopeFilter } from './common/http-exception.filter.js';
+import { DatabaseModule } from './database/database.module.js';
+import { AuthModule } from './auth/auth.module.js';
 
 @Module({
-  imports: [],
+  imports: [DatabaseModule, AuthModule],
   controllers: [HealthController],
   providers: [{ provide: APP_FILTER, useClass: HttpExceptionEnvelopeFilter }],
 })
