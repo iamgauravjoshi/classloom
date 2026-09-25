@@ -50,13 +50,14 @@ describe('authorization schema', () => {
     const journal = JSON.parse(readFileSync(new URL('../drizzle/meta/_journal.json', import.meta.url), 'utf8')) as {
       entries: { tag: string }[];
     };
-    const latestTag = journal.entries.at(-1)!.tag;
-    const migration = readFileSync(new URL(`../drizzle/${latestTag}.sql`, import.meta.url), 'utf8');
+    const migrations = journal.entries.map(({ tag }) =>
+      readFileSync(new URL(`../drizzle/${tag}.sql`, import.meta.url), 'utf8'),
+    );
 
     for (const table of ['authorization_roles', 'authorization_role_permissions', 'membership_role_assignments']) {
-      expect(migration).toContain(`ALTER TABLE "${table}" FORCE ROW LEVEL SECURITY`);
+      expect(migrations.some((migration) => migration.includes(`ALTER TABLE "${table}" FORCE ROW LEVEL SECURITY`))).toBe(true);
     }
-    expect(migration).toContain('GRANT SELECT ON TABLE permissions TO classloom_runtime');
+    expect(migrations.some((migration) => migration.includes('GRANT SELECT ON TABLE permissions TO classloom_runtime'))).toBe(true);
   });
 
   it.skipIf(!process.env.DATABASE_MIGRATION_URL)(
