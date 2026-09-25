@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDb } from './client.js';
 import { parseProvisionTenantArgs } from './provision-tenant.js';
 import { provisionTenant, ProvisioningConflictError } from './provisioning.js';
-import { schools } from './schema.js';
+import { authorizationRoles, schools } from './schema.js';
 import { withTenantContext } from './tenant-context.js';
 
 const provisionerUrl = process.env.DATABASE_PROVISIONER_URL;
@@ -79,6 +79,13 @@ describe.skipIf(!integrationEnabled)('provisionTenant', () => {
       timezone: input.timezone,
       currency: input.currency,
     });
+    const roles = await withTenantContext(db.db, result.tenant.id, (tx) =>
+      tx.select({ key: authorizationRoles.key }).from(authorizationRoles),
+    );
+    expect(roles.map(({ key }) => key)).toEqual(expect.arrayContaining([
+      'tenant_admin', 'school_admin', 'principal', 'teacher',
+      'attendance_operator', 'finance_operator', 'auditor',
+    ]));
   });
 
   it('maps a duplicate tenant slug to a provisioning conflict and preserves the original row', async () => {

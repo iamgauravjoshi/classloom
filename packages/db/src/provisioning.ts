@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import type { AppDb } from './client.js';
+import { seedTenantAuthorization } from './authorization-seeding.js';
 import { schools, tenants } from './schema.js';
 
 export interface ProvisionTenantInput {
@@ -40,6 +41,8 @@ export async function provisionTenant(
         timezone: input.timezone,
         currency: input.currency,
       }).returning();
+
+      await seedTenantAuthorization(tx, tenant.id);
 
       return { tenant, school };
     });
