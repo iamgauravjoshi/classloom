@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AuthorizationController } from './authorization.controller.js';
-import { listMembershipAuthorizationGrants } from '@classloom/db';
+import { isAuthorizationScopeInTenant, listMembershipAuthorizationGrants } from '@classloom/db';
 import { AuthModule } from '../auth/auth.module.js';
 import { DatabaseService } from '../database/database.service.js';
 import { AUTHORIZATION_GRANT_READER, AuthorizationService } from './authorization.service.js';
@@ -16,6 +16,8 @@ import { AuthorizationGuard } from './authorization.guard.js';
       useFactory: (database: DatabaseService) => ({
         listMembershipAuthorizationGrants: (context: { tenantId: string; accountId: string; membershipId: string }) =>
           listMembershipAuthorizationGrants(database.db, context),
+        isScopeInTenant: (context: { tenantId: string }, scope: import('@classloom/db').AuthorizationScope) =>
+          isAuthorizationScopeInTenant(database.db, context.tenantId, scope),
       }),
     },
     AuthorizationService,

@@ -1,16 +1,16 @@
 import { randomUUID } from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import postgres from 'postgres';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDb } from './client.js';
 import { seedTenantAuthorization } from './authorization-seeding.js';
 import {
   assignRole, canAccessScope, createCustomRole, listMembershipAuthorizationGrants,
-  revokeRoleAssignment, AuthorizationRepositoryError,
+  isAuthorizationScopeInTenant, listTenantAuthorizationAssignments, revokeRoleAssignment, AuthorizationRepositoryError,
 } from './authorization-repository.js';
 import { withTenantContext } from './tenant-context.js';
 import {
-  authorizationRoles, campuses, memberships, membershipRoleAssignments,
+  authorizationRolePermissions, authorizationRoles, campuses, memberships, membershipRoleAssignments,
   securityEvents,
 } from './schema.js';
 
@@ -93,7 +93,7 @@ describe.skipIf(!adminUrl || !runtimeUrl)('authorization repository PostgreSQL b
 
   async function systemRole(tenantId: string, key: string) {
     const [role] = await withTenantContext(runtime.db, tenantId, (tx) => tx.select({ id: authorizationRoles.id })
-      .from(authorizationRoles).where(eq(authorizationRoles.systemKey, key)).limit(1));
+      .from(authorizationRoles).where(and(eq(authorizationRoles.tenantId, tenantId), eq(authorizationRoles.systemKey, key))).limit(1));
     return role!.id;
   }
 
@@ -164,6 +164,117 @@ describe.skipIf(!adminUrl || !runtimeUrl)('authorization repository PostgreSQL b
       tenantId: tenantA.tenantId, membershipId: admin.membershipId, roleId: teacherId,
       scopeKind: 'campus', schoolId: tenantA.schoolId, campusId: randomUUID(),
     }))).rejects.toThrow();
+
+    const foreignAdminRoleId = await systemRole(tenantB.tenantId, 'tenant_admin');
+    const permissionKey = 'attendance.read';
+    await expect(withTenantContext(runtime.db, tenantA.tenantId, (tx) => tx.insert(membershipRoleAssignments).values({
+      tenantId: tenantA.tenantId, membershipId: foreignMember.membershipId, roleId: adminRoleId, scopeKind: 'tenant',
+    }))).rejects.toThrow();
+    await expect(withTenantContext(runtime.db, tenantA.tenantId, (tx) => tx.insert(membershipRoleAssignments).values({
+      tenantId: tenantA.tenantId, membershipId: admin.membershipId, roleId: foreignAdminRoleId, scopeKind: 'tenant',
+    }))).rejects.toThrow();
+    await expect(withTenantContext(runtime.db, tenantA.tenantId, (tx) => tx.insert(membershipRoleAssignments).values({
+      tenantId: tenantA.tenantId, membershipId: admin.membershipId, roleId: adminRoleId,
+      scopeKind: 'school', schoolId: tenantB.schoolId,
+    }))).rejects.toThrow();
+    await expect(withTenantContext(runtime.db, tenantA.tenantId, (tx) => tx.insert(membershipRoleAssignments).values({
+      tenantId: tenantA.tenantId, membershipId: admin.membershipId, roleId: adminRoleId,
+      scopeKind: 'campus', schoolId: tenantA.schoolId, campusId: tenantB.campusId,
+    }))).rejects.toThrow();
+    await expect(withTenantContext(runtime.db, tenantA.tenantId, (tx) => tx.insert(authorizationRolePermissions).values({
+      tenantId: tenantA.tenantId, roleId: foreignAdminRoleId, permissionKey,
+    }))).rejects.toThrow();
+  });
+
+  it('enforces the real permission ceiling and records recoverable assignments', async () => {
+    const tenant = await makeTenant();
+    const adminActor = await makeMember(tenant.tenantId);
+    const manager = await makeMember(tenant.tenantId);
+    const target = await makeMember(tenant.tenantId);
+    const tenantAdminRoleId = await systemRole(tenant.tenantId, 'tenant_admin');
+    await withTenantContext(runtime.db, tenant.tenantId, (tx) => tx.insert(membershipRoleAssignments).values({
+      tenantId: tenant.tenantId, membershipId: adminActor.membershipId, roleId: tenantAdminRoleId, scopeKind: 'tenant',
+    }));
+    const limitedManagerRole = await withTenantContext(runtime.db, tenant.tenantId, (tx) => createCustomRole(tx, {
+      tenantId: tenant.tenantId, actorAccountId: adminActor.accountId, actorMembershipId: adminActor.membershipId,
+      key: 'limited_role_manager', name: 'Limited role manager',
+      permissionKeys: ['authorization.roles.manage', 'attendance.read'], requestId: 'req-role-create',
+    }));
+    await withTenantContext(runtime.db, tenant.tenantId, (tx) => assignRole(tx, {
+      tenantId: tenant.tenantId, actorAccountId: adminActor.accountId, actorMembershipId: adminActor.membershipId,
+      membershipId: manager.membershipId, roleId: limitedManagerRole.id, scope: { kind: 'tenant' }, requestId: 'req-manager-assignment',
+    }));
+    const teacherRoleId = await systemRole(tenant.tenantId, 'teacher');
+    await expect(withTenantContext(runtime.db, tenant.tenantId, (tx) => assignRole(tx, {
+      tenantId: tenant.tenantId, actorAccountId: manager.accountId, actorMembershipId: manager.membershipId,
+      membershipId: target.membershipId, roleId: teacherRoleId, scope: { kind: 'tenant' },
+    }))).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    const assignment = await withTenantContext(runtime.db, tenant.tenantId, (tx) => assignRole(tx, {
+      tenantId: tenant.tenantId, actorAccountId: adminActor.accountId, actorMembershipId: adminActor.membershipId,
+      membershipId: target.membershipId, roleId: teacherRoleId,
+      scope: { kind: 'campus', schoolId: tenant.schoolId, campusId: tenant.campusId }, requestId: 'req-teacher-assignment',
+    }));
+    expect(assignment).toBeDefined();
+    const listed = await listTenantAuthorizationAssignments(runtime.db, tenant.tenantId);
+    expect(listed).toEqual(expect.arrayContaining([expect.objectContaining({
+      id: assignment!.id, membershipId: target.membershipId, roleId: teacherRoleId,
+      scopeKind: 'campus', schoolId: tenant.schoolId, campusId: tenant.campusId,
+      permissionKeys: expect.arrayContaining(['attendance.read', 'marks.enter']),
+    })]));
+
+    await withTenantContext(runtime.db, tenant.tenantId, (tx) => revokeRoleAssignment(tx, {
+      tenantId: tenant.tenantId, assignmentId: assignment!.id, actorAccountId: adminActor.accountId, requestId: 'req-teacher-revoke',
+    }));
+    const events = await admin<{ eventType: string; requestId: string | null; metadata: Record<string, unknown> }[]>`
+      select event_type as "eventType", request_id as "requestId", metadata
+      from security_events where tenant_id = ${tenant.tenantId}
+      order by created_at, id
+    `;
+    expect(events).toEqual(expect.arrayContaining([
+      expect.objectContaining({ eventType: 'authorization_role_created', requestId: 'req-role-create', metadata: expect.objectContaining({ afterPermissionKeys: 'attendance.read,authorization.roles.manage' }) }),
+      expect.objectContaining({ eventType: 'authorization_role_assigned', requestId: 'req-teacher-assignment', metadata: expect.objectContaining({
+        schoolId: tenant.schoolId, campusId: tenant.campusId, permissionKeys: expect.stringContaining('marks.enter'),
+        beforeScopeKind: '', afterScopeKind: 'campus', afterSchoolId: tenant.schoolId, afterCampusId: tenant.campusId,
+      }) }),
+      expect.objectContaining({ eventType: 'authorization_role_revoked', requestId: 'req-teacher-revoke', metadata: expect.objectContaining({
+        schoolId: tenant.schoolId, campusId: tenant.campusId, permissionKeys: expect.stringContaining('marks.enter'),
+        beforeScopeKind: 'campus', beforeSchoolId: tenant.schoolId, beforeCampusId: tenant.campusId, afterScopeKind: '',
+      }) }),
+    ]));
+  });
+
+  it('resolves only current resources from the active tenant', async () => {
+    const tenantA = await makeTenant();
+    const tenantB = await makeTenant();
+    expect(await isAuthorizationScopeInTenant(runtime.db, tenantA.tenantId, { kind: 'school', schoolId: tenantA.schoolId })).toBe(true);
+    expect(await isAuthorizationScopeInTenant(runtime.db, tenantA.tenantId, { kind: 'campus', schoolId: tenantA.schoolId, campusId: tenantA.campusId })).toBe(true);
+    expect(await isAuthorizationScopeInTenant(runtime.db, tenantA.tenantId, { kind: 'school', schoolId: tenantB.schoolId })).toBe(false);
+    expect(await isAuthorizationScopeInTenant(runtime.db, tenantA.tenantId, { kind: 'campus', schoolId: tenantA.schoolId, campusId: tenantB.campusId })).toBe(false);
+    await admin`delete from schools where id = ${tenantA.schoolId}`;
+    expect(await isAuthorizationScopeInTenant(runtime.db, tenantA.tenantId, { kind: 'school', schoolId: tenantA.schoolId })).toBe(false);
+  });
+
+  it('does not count a disabled account as the final active tenant administrator', async () => {
+    const tenant = await makeTenant();
+    const usableAdmin = await makeMember(tenant.tenantId);
+    const disabledAdmin = await makeMember(tenant.tenantId);
+    const adminRoleId = await systemRole(tenant.tenantId, 'tenant_admin');
+    const [usableAssignment] = await withTenantContext(runtime.db, tenant.tenantId, (tx) => tx.insert(membershipRoleAssignments).values({
+      tenantId: tenant.tenantId, membershipId: usableAdmin.membershipId, roleId: adminRoleId, scopeKind: 'tenant',
+    }).returning());
+    await withTenantContext(runtime.db, tenant.tenantId, (tx) => tx.insert(membershipRoleAssignments).values({
+      tenantId: tenant.tenantId, membershipId: disabledAdmin.membershipId, roleId: adminRoleId, scopeKind: 'tenant',
+    }));
+    await admin`update accounts set status = 'disabled' where id = ${disabledAdmin.accountId}`;
+
+    await expect(withTenantContext(runtime.db, tenant.tenantId, (tx) => revokeRoleAssignment(tx, {
+      tenantId: tenant.tenantId, assignmentId: usableAssignment!.id, actorAccountId: usableAdmin.accountId,
+    }))).rejects.toMatchObject({ code: 'LAST_TENANT_ADMIN' });
+    const grants = await listMembershipAuthorizationGrants(runtime.db, {
+      tenantId: tenant.tenantId, accountId: disabledAdmin.accountId, membershipId: disabledAdmin.membershipId,
+    });
+    expect(grants).toEqual([]);
   });
 
   it('rolls back audit and role changes together and serializes final administrator revocations', async () => {

@@ -282,6 +282,7 @@ git commit -m "feat(authz): enforce permission guards"
 - `GET /api/v1/authorization/roles` lists built-in and custom roles with permission keys.
 - `POST /api/v1/authorization/roles` creates a tenant custom role from known permission keys.
 - `POST /api/v1/authorization/assignments` assigns an existing tenant role to an active membership at a validated tenant/school/campus scope.
+- `GET /api/v1/authorization/assignments` lists tenant-scoped assignments with their role, member, scope, and permission keys.
 - `DELETE /api/v1/authorization/assignments/:assignmentId` revokes an assignment.
 - Role and assignment writes require `authorization.roles.manage`; list endpoints require `authorization.roles.read`.
 - CLI: `pnpm --filter @classloom/api auth:bootstrap-admin -- <tenant-id> <email>` finds an existing active membership and grants its tenant-wide `tenant_admin` role. It logs no secrets and writes an audit event.

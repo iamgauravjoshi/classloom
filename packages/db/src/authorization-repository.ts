@@ -3,9 +3,9 @@ import type { AppDb, TenantTransaction } from './client.js';
 import { PERMISSION_CATALOG, type PermissionKey } from './authorization-catalog.js';
 import { withTenantContext } from './tenant-context.js';
 import {
-  accounts,
   authorizationRolePermissions,
   authorizationRoles,
+  accounts,
   campuses,
   memberships,
   membershipRoleAssignments,
@@ -21,7 +21,7 @@ export type AuthorizationScope =
 export type AuthorizationGrant = { permissionKey: string; scope: AuthorizationScope };
 
 export class AuthorizationRepositoryError extends Error {
-  constructor(message: string, readonly code: 'FORBIDDEN' | 'NOT_FOUND' | 'INVALID_SCOPE' | 'LAST_TENANT_ADMIN') {
+  constructor(message: string, readonly code: 'FORBIDDEN' | 'NOT_FOUND' | 'INVALID_SCOPE' | 'LAST_TENANT_ADMIN' | 'CONFLICT') {
     super(message);
     this.name = 'AuthorizationRepositoryError';
   }
@@ -75,6 +75,7 @@ async function grantsForMembership(tx: TenantTransaction, tenantId: string, acco
       eq(memberships.id, membershipRoleAssignments.membershipId),
       eq(memberships.tenantId, membershipRoleAssignments.tenantId),
     ))
+    .innerJoin(accounts, eq(accounts.id, memberships.accountId))
     .innerJoin(authorizationRoles, and(
       eq(authorizationRoles.id, membershipRoleAssignments.roleId),
       eq(authorizationRoles.tenantId, membershipRoleAssignments.tenantId),
@@ -88,6 +89,7 @@ async function grantsForMembership(tx: TenantTransaction, tenantId: string, acco
       eq(membershipRoleAssignments.membershipId, membershipId),
       eq(memberships.accountId, accountId),
       eq(memberships.status, 'active'),
+      eq(accounts.status, 'active'),
     ));
   return rows.flatMap((row) => {
     const scope = rowScope(row);
@@ -102,6 +104,15 @@ export async function listMembershipAuthorizationGrants(
   return withTenantContext(db, input.tenantId, async (tx) => grantsForMembership(
     tx, input.tenantId, input.accountId, input.membershipId,
   ));
+}
+
+export async function isAuthorizationScopeInTenant(db: AppDb, tenantId: string, scope: AuthorizationScope): Promise<boolean> {
+  try {
+    await withTenantContext(db, tenantId, (tx) => validateScope(tx, tenantId, scope));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function requireKnownPermissions(keys: readonly string[]): asserts keys is readonly PermissionKey[] {
@@ -167,10 +178,13 @@ export async function createCustomRole(
   tx: TenantTransaction,
   input: {
     tenantId: string; actorAccountId: string; actorMembershipId: string;
-    key: string; name: string; permissionKeys: readonly string[];
+    key: string; name: string; permissionKeys: readonly string[]; requestId?: string;
   },
 ) {
   requireKnownPermissions(input.permissionKeys);
+  if (new Set(input.permissionKeys).size !== input.permissionKeys.length) {
+    throw new AuthorizationRepositoryError('Duplicate permission keys are not allowed', 'CONFLICT');
+  }
   await assertActorCan(tx, input, 'authorization.roles.manage', { kind: 'tenant' });
   for (const key of input.permissionKeys) {
     const grants = await grantsForMembership(tx, input.tenantId, input.actorAccountId, input.actorMembershipId);
@@ -180,8 +194,8 @@ export async function createCustomRole(
   }
   const [role] = await tx.insert(authorizationRoles).values({
     tenantId: input.tenantId, key: input.key, name: input.name, systemKey: null,
-  }).returning();
-  if (!role) throw new Error('Custom role insert did not return a row');
+  }).onConflictDoNothing({ target: [authorizationRoles.tenantId, authorizationRoles.key] }).returning();
+  if (!role) throw new AuthorizationRepositoryError('A role with this key already exists', 'CONFLICT');
   if (input.permissionKeys.length) {
     await tx.insert(authorizationRolePermissions).values(input.permissionKeys.map((permissionKey) => ({
       tenantId: input.tenantId, roleId: role.id, permissionKey,
@@ -189,7 +203,8 @@ export async function createCustomRole(
   }
   await tx.insert(securityEvents).values({
     eventType: 'authorization_role_created', accountId: input.actorAccountId, tenantId: input.tenantId,
-    metadata: { roleId: role.id, roleKey: role.key, permissionCount: input.permissionKeys.length },
+    requestId: input.requestId,
+    metadata: { roleId: role.id, roleKey: role.key, beforePermissionKeys: '', afterPermissionKeys: [...input.permissionKeys].sort().join(',') },
   });
   return role;
 }
@@ -198,7 +213,7 @@ export async function assignRole(
   tx: TenantTransaction,
   input: {
     tenantId: string; actorAccountId: string; actorMembershipId: string;
-    membershipId: string; roleId: string; scope: AuthorizationScope;
+    membershipId: string; roleId: string; scope: AuthorizationScope; requestId?: string;
   },
 ) {
   const targetScope = input.scope;
@@ -231,7 +246,15 @@ export async function assignRole(
   if (assignment) {
     await tx.insert(securityEvents).values({
       eventType: 'authorization_role_assigned', accountId: input.actorAccountId, tenantId: input.tenantId,
-      metadata: { assignmentId: assignment.id, membershipId: assignment.membershipId, roleId: assignment.roleId, scopeKind: assignment.scopeKind },
+      requestId: input.requestId,
+      metadata: {
+        assignmentId: assignment.id, membershipId: assignment.membershipId, roleId: assignment.roleId,
+        scopeKind: assignment.scopeKind, schoolId: assignment.schoolId, campusId: assignment.campusId,
+        permissionKeys: rolePermissions.map(({ permissionKey }) => permissionKey).sort().join(','),
+        beforeScopeKind: '', beforeSchoolId: null, beforeCampusId: null, beforePermissionKeys: '',
+        afterScopeKind: assignment.scopeKind, afterSchoolId: assignment.schoolId, afterCampusId: assignment.campusId,
+        afterPermissionKeys: rolePermissions.map(({ permissionKey }) => permissionKey).sort().join(','),
+      },
     });
   }
   return assignment;
@@ -239,7 +262,7 @@ export async function assignRole(
 
 export async function revokeRoleAssignment(
   tx: TenantTransaction,
-  input: { tenantId: string; assignmentId: string; actorAccountId: string },
+  input: { tenantId: string; assignmentId: string; actorAccountId: string; requestId?: string },
 ) {
   const [existing] = await tx.select({
     id: membershipRoleAssignments.id,
@@ -252,6 +275,11 @@ export async function revokeRoleAssignment(
     eq(membershipRoleAssignments.id, input.assignmentId), eq(membershipRoleAssignments.tenantId, input.tenantId),
   )).limit(1);
   if (!existing) throw new AuthorizationRepositoryError('Role assignment not found', 'NOT_FOUND');
+  const permissionRows = await tx.select({ permissionKey: authorizationRolePermissions.permissionKey })
+    .from(authorizationRolePermissions).where(and(
+      eq(authorizationRolePermissions.tenantId, input.tenantId),
+      eq(authorizationRolePermissions.roleId, existing.roleId),
+    ));
 
   if (existing.scopeKind === 'tenant') {
     const [role] = await tx.select({ systemKey: authorizationRoles.systemKey }).from(authorizationRoles).where(and(
@@ -263,10 +291,12 @@ export async function revokeRoleAssignment(
         from membership_role_assignments assignment
         join authorization_roles role on role.tenant_id = assignment.tenant_id and role.id = assignment.role_id
         join memberships member on member.tenant_id = assignment.tenant_id and member.id = assignment.membership_id
+        join accounts account on account.id = member.account_id
         where assignment.tenant_id = ${input.tenantId}
           and assignment.scope_kind = 'tenant'
           and role.system_key = 'tenant_admin'
           and member.status = 'active'
+          and account.status = 'active'
         order by assignment.id
         for update of assignment
       `);
@@ -292,11 +322,13 @@ export async function revokeRoleAssignment(
           eq(memberships.id, membershipRoleAssignments.membershipId),
           eq(memberships.tenantId, membershipRoleAssignments.tenantId),
         ))
+        .innerJoin(accounts, eq(accounts.id, memberships.accountId))
         .where(and(
           eq(membershipRoleAssignments.tenantId, input.tenantId),
           eq(membershipRoleAssignments.scopeKind, 'tenant'),
           eq(authorizationRoles.systemKey, 'tenant_admin'),
           eq(memberships.status, 'active'),
+          eq(accounts.status, 'active'),
         ));
       if (remaining.length === 0) {
         throw new AuthorizationRepositoryError('Cannot remove the final active tenant administrator', 'LAST_TENANT_ADMIN');
@@ -305,7 +337,15 @@ export async function revokeRoleAssignment(
   }
   await tx.insert(securityEvents).values({
     eventType: 'authorization_role_revoked', accountId: input.actorAccountId, tenantId: input.tenantId,
-    metadata: { assignmentId: removed.id, membershipId: removed.membershipId, roleId: removed.roleId, scopeKind: removed.scopeKind },
+    requestId: input.requestId,
+    metadata: {
+      assignmentId: removed.id, membershipId: removed.membershipId, roleId: removed.roleId,
+      scopeKind: removed.scopeKind, schoolId: removed.schoolId, campusId: removed.campusId,
+      permissionKeys: permissionRows.map(({ permissionKey }) => permissionKey).sort().join(','),
+      beforeScopeKind: removed.scopeKind, beforeSchoolId: removed.schoolId, beforeCampusId: removed.campusId,
+      beforePermissionKeys: permissionRows.map(({ permissionKey }) => permissionKey).sort().join(','),
+      afterScopeKind: '', afterSchoolId: null, afterCampusId: null, afterPermissionKeys: '',
+    },
   });
   return removed;
 }
@@ -325,6 +365,54 @@ export async function listTenantAuthorizationRoles(db: AppDb, tenantId: string) 
       grouped.set(permission.roleId, keys);
     }
     return roles.map((role) => ({ ...role, permissionKeys: (grouped.get(role.id) ?? []).sort() }));
+  });
+}
+
+export async function listTenantAuthorizationAssignments(db: AppDb, tenantId: string) {
+  return withTenantContext(db, tenantId, async (tx) => {
+    const assignments = await tx.select({
+      id: membershipRoleAssignments.id,
+      membershipId: membershipRoleAssignments.membershipId,
+      roleId: membershipRoleAssignments.roleId,
+      roleKey: authorizationRoles.key,
+      roleName: authorizationRoles.name,
+      systemKey: authorizationRoles.systemKey,
+      scopeKind: membershipRoleAssignments.scopeKind,
+      schoolId: membershipRoleAssignments.schoolId,
+      campusId: membershipRoleAssignments.campusId,
+      membershipStatus: memberships.status,
+      accountEmail: accounts.normalizedEmail,
+      createdByAccountId: membershipRoleAssignments.createdByAccountId,
+      createdAt: membershipRoleAssignments.createdAt,
+    }).from(membershipRoleAssignments)
+      .innerJoin(authorizationRoles, and(
+        eq(authorizationRoles.id, membershipRoleAssignments.roleId),
+        eq(authorizationRoles.tenantId, membershipRoleAssignments.tenantId),
+      ))
+      .innerJoin(memberships, and(
+        eq(memberships.id, membershipRoleAssignments.membershipId),
+        eq(memberships.tenantId, membershipRoleAssignments.tenantId),
+      ))
+      .innerJoin(accounts, eq(accounts.id, memberships.accountId))
+      .where(eq(membershipRoleAssignments.tenantId, tenantId));
+    if (!assignments.length) return [];
+    const permissionRows = await tx.select({
+      roleId: authorizationRolePermissions.roleId,
+      permissionKey: authorizationRolePermissions.permissionKey,
+    }).from(authorizationRolePermissions).where(and(
+      eq(authorizationRolePermissions.tenantId, tenantId),
+      inArray(authorizationRolePermissions.roleId, [...new Set(assignments.map(({ roleId }) => roleId))]),
+    ));
+    const permissionsByRole = new Map<string, string[]>();
+    for (const row of permissionRows) {
+      const keys = permissionsByRole.get(row.roleId) ?? [];
+      keys.push(row.permissionKey);
+      permissionsByRole.set(row.roleId, keys);
+    }
+    return assignments.map((assignment) => ({
+      ...assignment,
+      permissionKeys: (permissionsByRole.get(assignment.roleId) ?? []).sort(),
+    }));
   });
 }
 

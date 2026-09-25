@@ -61,7 +61,7 @@ The phase does not require a full permission-management UI. The APIs and CLI are
 
 ## Audit
 
-Record role creation, permission changes to custom roles, role assignment, role revocation, and trusted bootstrap using append-only security audit events. Include actor account, tenant, subject membership or role ID, request ID when present, and a minimal before/after summary. Do not store credentials, session tokens, invitation tokens, or other secrets in audit metadata. Audit write and authorization mutation succeed or fail atomically.
+Record role creation, permission changes to custom roles, role assignment, role revocation, and trusted bootstrap using append-only security audit events. Include actor account, tenant, subject membership or role ID, request ID when present, and a minimal before/after summary. Do not store credentials, session tokens, invitation tokens, or other secrets in audit metadata. Audit write and authorization mutation succeed or fail atomically. Custom-role edit endpoints are deferred from Phase 3; creation records the initial permission set, and permission-change events are required when editing is introduced.
 
 Attendance corrections, mark changes, result publication, payment adjustments, exports, and other business audit events are emitted by the future domain modules when those operations exist.
 

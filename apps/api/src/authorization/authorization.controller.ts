@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  ConflictException,
   Delete,
   ForbiddenException,
   Get,
@@ -18,6 +19,7 @@ import {
   assignRole,
   createCustomRole,
   listTenantAuthorizationRoles,
+  listTenantAuthorizationAssignments,
   PERMISSION_CATALOG,
   revokeRoleAssignment,
   withTenantContext,
@@ -41,7 +43,9 @@ const createRoleSchema = z.object({
   key: z.string().trim().min(2).max(80).regex(/^[a-z][a-z0-9_]*$/),
   name: z.string().trim().min(2).max(120),
   permissionKeys: z.array(z.string().min(1).max(120)).max(PERMISSION_CATALOG.length),
-}).strict();
+}).strict().refine(({ permissionKeys }) => new Set(permissionKeys).size === permissionKeys.length, {
+  message: 'Permission keys must be unique',
+});
 const assignSchema = z.object({ membershipId: uuid, roleId: uuid, scope: scopeSchema }).strict();
 
 function parse<T>(schema: z.ZodType<T>, value: unknown): T {
@@ -60,6 +64,7 @@ function mapRepositoryError(error: unknown): never {
   if (error instanceof AuthorizationRepositoryError) {
     if (error.code === 'FORBIDDEN' || error.code === 'LAST_TENANT_ADMIN') throw new ForbiddenException(error.message);
     if (error.code === 'NOT_FOUND') throw new NotFoundException(error.message);
+    if (error.code === 'CONFLICT') throw new ConflictException(error.message);
     throw new BadRequestException(error.message);
   }
   throw error;
@@ -94,7 +99,7 @@ export class AuthorizationController {
     const input = parse(createRoleSchema, body);
     try {
       return await withTenantContext(this.database.db, context.tenantId, (tx) => createCustomRole(tx, {
-        ...context, ...input,
+        ...context, ...input, requestId: request.requestId,
       }));
     } catch (error) {
       return mapRepositoryError(error);
@@ -112,11 +117,20 @@ export class AuthorizationController {
         membershipId: input.membershipId,
         roleId: input.roleId,
         scope: input.scope as AuthorizationScope,
+        requestId: request.requestId,
       }));
       return assignment ?? { alreadyAssigned: true };
     } catch (error) {
       return mapRepositoryError(error);
     }
+  }
+
+  @Get('assignments')
+  @RequirePermissions('authorization.roles.read')
+  listAssignments(@Req() request: AuthenticatedRequest, @Query() query: Record<string, unknown>) {
+    if (Object.hasOwn(query, 'tenantId')) throw new BadRequestException('Tenant cannot be selected by the client');
+    const { tenantId } = tenantContext(request);
+    return listTenantAuthorizationAssignments(this.database.db, tenantId);
   }
 
   @Delete('assignments/:assignmentId')
@@ -126,7 +140,7 @@ export class AuthorizationController {
     if (!uuid.safeParse(assignmentId).success) throw new BadRequestException('Invalid assignment ID');
     try {
       return await withTenantContext(this.database.db, context.tenantId, (tx) => revokeRoleAssignment(tx, {
-        tenantId: context.tenantId, assignmentId, actorAccountId: context.actorAccountId,
+        tenantId: context.tenantId, assignmentId, actorAccountId: context.actorAccountId, requestId: request.requestId,
       }));
     } catch (error) {
       return mapRepositoryError(error);

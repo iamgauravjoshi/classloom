@@ -34,7 +34,7 @@ Run `pnpm --filter @classloom/db test` and `pnpm --filter @classloom/api test`; 
 
 ## Authorization roles
 
-Phase 3 authorization uses the active session membership and tenant. The permission catalog is application-owned; each tenant receives the built-in role templates during provisioning. Tenant administrators can create custom roles and assign roles at tenant, school, or campus scope. Assignment writes require `authorization.roles.manage`; catalog and role reads require `authorization.roles.read`. Role changes and their audit events commit in the same database transaction. Academic and relationship scopes remain unavailable until their domain modules can resolve them.
+Phase 3 authorization uses the active session membership and tenant. The permission catalog is application-owned; each tenant receives the built-in role templates during provisioning. Tenant administrators can create custom roles, list role assignments, and assign or revoke roles at tenant, school, or campus scope. Assignment writes require `authorization.roles.manage`; catalog, role, and assignment reads require `authorization.roles.read`. Role changes and their audit events commit in the same database transaction; audit rows include the request ID and exact role permissions and assignment scope. Disabled accounts do not count toward the final active tenant-administrator safeguard. Custom role permission editing is deferred; duplicate role keys return conflict and duplicate permission keys are rejected.
 
 To bootstrap the first tenant administrator, first ensure the person has an active membership in the tenant, then run:
 
@@ -44,4 +44,4 @@ pnpm --filter @classloom/api auth:bootstrap-admin -- <tenant-id> person@example.
 
 The CLI uses the application's restricted runtime database URL, grants only the built-in tenant administrator role at tenant scope, and records a trusted-bootstrap audit event. Repeating it is safe.
 
-Protected API routes declare permissions with `@RequirePermissions('authorization.roles.read')`; keep `AuthGuard` before `AuthorizationGuard`. Resolve tenant and active membership only from `request.auth`, and use a server-side resource resolver to supply a school or campus scope for resource routes. Until academic and relationship resolvers exist, those requests must deny access.
+Protected API routes declare permissions with `@RequirePermissions('authorization.roles.read')`; keep `AuthGuard` before `AuthorizationGuard`. Missing or empty permission metadata is forbidden. Resolve tenant and active membership only from `request.auth`, and use a server-side resource resolver to supply `request.authorizationTargetScope` for resource routes. The authorization service verifies school and campus existence in the active tenant before evaluating grants. Missing scope, foreign or removed resources, and unsupported academic or relationship scopes deny access.

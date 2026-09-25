@@ -57,6 +57,8 @@ export {
   createCustomRole,
   assignRole,
   revokeRoleAssignment,
+  isAuthorizationScopeInTenant,
+  listTenantAuthorizationAssignments,
   AuthorizationRepositoryError,
 } from './authorization-repository.js';
 export type { AuthorizationScope, AuthorizationGrant } from './authorization-repository.js';

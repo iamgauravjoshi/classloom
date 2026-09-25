@@ -26,6 +26,8 @@ Each school operates as an isolated tenant within the SaaS platform.
 
 ClassLoom is being developed incrementally, with each major feature documented, designed, implemented, tested, and integrated into the broader architecture.
 
+The foundation includes tenant-isolated PostgreSQL data, email/password accounts with server-side sessions, and tenant-scoped roles and permissions. Authorization checks use the active membership from the session; school and campus checks require a server-resolved resource scope. Academic and person-relationship access remains denied until their domain modules provide resource resolvers.
+
 ---
 
 ## Core Goals

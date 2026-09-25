@@ -12,9 +12,10 @@ export interface AuthorizationContext {
 
 export interface AuthorizationGrantReader {
   listMembershipAuthorizationGrants(context: { tenantId: string; accountId: string; membershipId: string }): Promise<AuthorizationGrant[]>;
+  isScopeInTenant(context: { tenantId: string }, scope: AuthorizationScope): Promise<boolean>;
 }
 
-const knownPermissionKeys = new Set<string>(PERMISSION_CATALOG.map(({ key }) => key));
+const permissionsByKey = new Map(PERMISSION_CATALOG.map((permission) => [permission.key, permission]));
 
 @Injectable()
 export class AuthorizationService {
@@ -26,9 +27,17 @@ export class AuthorizationService {
     targetScope?: AuthorizationScope,
   ): Promise<boolean> {
     if (!context.tenantId || !context.accountId || !context.membershipId || requiredKeys.length === 0) return false;
-    if (requiredKeys.some((key) => !knownPermissionKeys.has(key))) return false;
+    const permissionDefinitions = requiredKeys.map((key) => permissionsByKey.get(key));
+    if (permissionDefinitions.some((permission) => !permission)) return false;
     const scope = targetScope ?? { kind: 'tenant' as const };
+    if (permissionDefinitions.some((permission) => {
+      if (!permission || ['academic', 'relationship'].includes(String(permission.scopeKind))) return true;
+      const targetDepth = scope.kind === 'tenant' ? 0 : scope.kind === 'school' ? 1 : scope.kind === 'campus' ? 2 : -1;
+      const requiredDepth = permission.scopeKind === 'tenant' ? 0 : permission.scopeKind === 'school' ? 1 : 2;
+      return targetDepth < requiredDepth;
+    })) return false;
     try {
+      if (scope.kind !== 'tenant' && !await this.grantReader.isScopeInTenant({ tenantId: context.tenantId }, scope)) return false;
       const grants = await this.grantReader.listMembershipAuthorizationGrants({
         tenantId: context.tenantId,
         accountId: context.accountId,
