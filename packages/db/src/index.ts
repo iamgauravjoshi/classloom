@@ -22,6 +22,7 @@ export {
 } from './schema.js';
 export { withTenantContext } from './tenant-context.js';
 export { withAccountContext } from './account-context.js';
+export { seedTenantAuthorization } from './authorization-seeding.js';
 export { PERMISSION_CATALOG, BUILT_IN_ROLE_TEMPLATES } from './authorization-catalog.js';
 export type { PermissionKey, AuthorizationScopeKind } from './authorization-catalog.js';
 export {
@@ -50,3 +51,12 @@ export {
   acceptInvitationForNewAccount,
   InvitationError,
 } from './invite-membership.js';
+export {
+  canAccessScope,
+  listMembershipAuthorizationGrants,
+  createCustomRole,
+  assignRole,
+  revokeRoleAssignment,
+  AuthorizationRepositoryError,
+} from './authorization-repository.js';
+export type { AuthorizationScope, AuthorizationGrant } from './authorization-repository.js';
