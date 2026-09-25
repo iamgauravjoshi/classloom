@@ -5,9 +5,10 @@ import { RequestIdMiddleware } from './common/request-id.middleware.js';
 import { HttpExceptionEnvelopeFilter } from './common/http-exception.filter.js';
 import { DatabaseModule } from './database/database.module.js';
 import { AuthModule } from './auth/auth.module.js';
+import { AuthorizationModule } from './authorization/authorization.module.js';
 
 @Module({
-  imports: [DatabaseModule, AuthModule],
+  imports: [DatabaseModule, AuthModule, AuthorizationModule],
   controllers: [HealthController],
   providers: [{ provide: APP_FILTER, useClass: HttpExceptionEnvelopeFilter }],
 })
@@ -16,3 +17,4 @@ export class AppModule implements NestModule {
     consumer.apply(RequestIdMiddleware).forRoutes({ path: '{*path}', method: RequestMethod.ALL });
   }
 }
+

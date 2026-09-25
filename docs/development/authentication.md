@@ -31,3 +31,15 @@ Browser authentication calls go through the same-origin Next.js `/api/auth/*` pr
 ## Verify
 
 Run `pnpm --filter @classloom/db test` and `pnpm --filter @classloom/api test`; PostgreSQL integration tests run when both `DATABASE_URL` and `DATABASE_MIGRATION_URL` are set. Then run `pnpm test:e2e`, `pnpm typecheck`, `pnpm lint`, and `pnpm build`.
+
+## Authorization roles
+
+Phase 3 authorization uses the active session membership and tenant. The permission catalog is application-owned; each tenant receives the built-in role templates during provisioning. Tenant administrators can create custom roles and assign roles at tenant, school, or campus scope. Assignment writes require `authorization.roles.manage`; catalog and role reads require `authorization.roles.read`. Role changes and their audit events commit in the same database transaction. Academic and relationship scopes remain unavailable until their domain modules can resolve them.
+
+To bootstrap the first tenant administrator, first ensure the person has an active membership in the tenant, then run:
+
+```powershell
+pnpm --filter @classloom/api auth:bootstrap-admin -- <tenant-id> person@example.test
+```
+
+The CLI uses the application's restricted runtime database URL, grants only the built-in tenant administrator role at tenant scope, and records a trusted-bootstrap audit event. Repeating it is safe.

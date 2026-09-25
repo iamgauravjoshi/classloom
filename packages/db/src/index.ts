@@ -60,3 +60,4 @@ export {
   AuthorizationRepositoryError,
 } from './authorization-repository.js';
 export type { AuthorizationScope, AuthorizationGrant } from './authorization-repository.js';
+export { listTenantAuthorizationRoles, bootstrapTenantAdmin } from './authorization-repository.js';

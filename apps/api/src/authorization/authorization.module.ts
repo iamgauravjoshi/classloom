@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AuthorizationController } from './authorization.controller.js';
 import { listMembershipAuthorizationGrants } from '@classloom/db';
 import { AuthModule } from '../auth/auth.module.js';
 import { DatabaseService } from '../database/database.service.js';
@@ -6,6 +7,7 @@ import { AUTHORIZATION_GRANT_READER, AuthorizationService } from './authorizatio
 import { AuthorizationGuard } from './authorization.guard.js';
 
 @Module({
+  controllers: [AuthorizationController],
   imports: [AuthModule],
   providers: [
     {
@@ -22,3 +24,5 @@ import { AuthorizationGuard } from './authorization.guard.js';
   exports: [AuthorizationService, AuthorizationGuard],
 })
 export class AuthorizationModule {}
+
+

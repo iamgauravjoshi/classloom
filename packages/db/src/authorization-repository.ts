@@ -1,14 +1,14 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { AppDb, TenantTransaction } from './client.js';
 import { PERMISSION_CATALOG, type PermissionKey } from './authorization-catalog.js';
 import { withTenantContext } from './tenant-context.js';
 import {
+  accounts,
   authorizationRolePermissions,
   authorizationRoles,
   campuses,
   memberships,
   membershipRoleAssignments,
-  permissions,
   schools,
   securityEvents,
 } from './schema.js';
@@ -309,4 +309,56 @@ export async function revokeRoleAssignment(
   });
   return removed;
 }
+
+
+export async function listTenantAuthorizationRoles(db: AppDb, tenantId: string) {
+  return withTenantContext(db, tenantId, async (tx) => {
+    const roles = await tx.select().from(authorizationRoles).where(eq(authorizationRoles.tenantId, tenantId));
+    if (!roles.length) return [];
+    const permissions = await tx.select({ roleId: authorizationRolePermissions.roleId, permissionKey: authorizationRolePermissions.permissionKey })
+      .from(authorizationRolePermissions)
+      .where(and(eq(authorizationRolePermissions.tenantId, tenantId), inArray(authorizationRolePermissions.roleId, roles.map(({ id }) => id))));
+    const grouped = new Map<string, string[]>();
+    for (const permission of permissions) {
+      const keys = grouped.get(permission.roleId) ?? [];
+      keys.push(permission.permissionKey);
+      grouped.set(permission.roleId, keys);
+    }
+    return roles.map((role) => ({ ...role, permissionKeys: (grouped.get(role.id) ?? []).sort() }));
+  });
+}
+
+export async function bootstrapTenantAdmin(
+  db: AppDb,
+  input: { tenantId: string; email: string },
+) {
+  return withTenantContext(db, input.tenantId, async (tx) => {
+    const normalizedEmail = input.email.trim().normalize('NFKC').toLowerCase();
+    const [member] = await tx.select({ membershipId: memberships.id, accountId: memberships.accountId })
+      .from(memberships)
+      .innerJoin(accounts, eq(accounts.id, memberships.accountId))
+      .where(and(
+        eq(memberships.tenantId, input.tenantId),
+        eq(memberships.status, 'active'),
+        eq(accounts.normalizedEmail, normalizedEmail),
+      )).limit(1);
+    if (!member) throw new AuthorizationRepositoryError('Active membership for email not found in tenant', 'NOT_FOUND');
+    const [role] = await tx.select({ id: authorizationRoles.id }).from(authorizationRoles).where(and(
+      eq(authorizationRoles.tenantId, input.tenantId), eq(authorizationRoles.systemKey, 'tenant_admin'),
+    )).limit(1);
+    if (!role) throw new AuthorizationRepositoryError('Tenant administrator role is not seeded', 'NOT_FOUND');
+    const [assignment] = await tx.insert(membershipRoleAssignments).values({
+      tenantId: input.tenantId, membershipId: member.membershipId, roleId: role.id,
+      scopeKind: 'tenant', schoolId: null, campusId: null, createdByAccountId: null,
+    }).onConflictDoNothing().returning();
+    if (assignment) {
+      await tx.insert(securityEvents).values({
+        eventType: 'tenant_admin_bootstrapped', accountId: null, tenantId: input.tenantId,
+        metadata: { membershipId: member.membershipId, roleId: role.id, source: 'trusted_bootstrap_cli' },
+      });
+    }
+    return { membershipId: member.membershipId, assignmentId: assignment?.id ?? null, alreadyAssigned: !assignment };
+  });
+}
+
 
