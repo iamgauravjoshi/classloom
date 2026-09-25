@@ -85,7 +85,7 @@ function SidebarContents({ onNavigate }: { onNavigate?: () => void }) {
           <ChevronRight className="nav-chevron" size={16} />
         </Link>
         <p className="nav-caption nav-caption-spaced">
-          SCHOOL MANAGEMENT <span className="preview-label">COMING LATER</span>
+          SCHOOL MANAGEMENT <span className="preview-label">SOON</span>
         </p>
         {upcomingSections.map((section) => {
           const Icon = sectionIcons[section.icon];
