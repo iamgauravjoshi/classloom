@@ -2,6 +2,8 @@ import { sql } from 'drizzle-orm';
 import {
   foreignKey,
   index,
+  boolean,
+  check,
   integer,
   jsonb,
   pgTable,
@@ -9,6 +11,7 @@ import {
   serial,
   text,
   timestamp,
+  unique,
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
@@ -213,3 +216,102 @@ export const authRateLimits = pgTable('auth_rate_limits', {
   uniqueIndex('auth_rate_limits_scope_subject_unique').on(table.scope, table.subjectDigest),
   index('auth_rate_limits_window_idx').on(table.blockedUntil, table.windowStartedAt),
 ]);
+
+export const permissions = pgTable('permissions', {
+  key: text('key').primaryKey(),
+  family: text('family').notNull(),
+  scopeKind: text('scope_kind').notNull(),
+  action: text('action').notNull(),
+  readOnly: boolean('read_only').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const authorizationRoles = pgTable('authorization_roles', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  key: text('key').notNull(),
+  name: text('name').notNull(),
+  systemKey: text('system_key'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex('authorization_roles_tenant_id_id_unique').on(table.tenantId, table.id),
+  uniqueIndex('authorization_roles_tenant_key_unique').on(table.tenantId, table.key),
+  uniqueIndex('authorization_roles_tenant_system_key_unique')
+    .on(table.tenantId, table.systemKey)
+    .where(sql`${table.systemKey} is not null`),
+  pgPolicy('authorization_roles_tenant_isolation', {
+    for: 'all',
+    to: 'public',
+    using: sql`tenant_id = nullif(current_setting('app.tenant_id', true), '')::uuid`,
+    withCheck: sql`tenant_id = nullif(current_setting('app.tenant_id', true), '')::uuid`,
+  }),
+]).enableRLS();
+
+export const authorizationRolePermissions = pgTable('authorization_role_permissions', {
+  tenantId: uuid('tenant_id').notNull(),
+  roleId: uuid('role_id').notNull(),
+  permissionKey: text('permission_key').notNull().references(() => permissions.key, { onDelete: 'restrict' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex('authorization_role_permissions_unique').on(table.tenantId, table.roleId, table.permissionKey),
+  foreignKey({
+    columns: [table.tenantId, table.roleId],
+    foreignColumns: [authorizationRoles.tenantId, authorizationRoles.id],
+    name: 'authorization_role_permissions_tenant_role_fk',
+  }).onDelete('cascade'),
+  pgPolicy('authorization_role_permissions_tenant_isolation', {
+    for: 'all',
+    to: 'public',
+    using: sql`tenant_id = nullif(current_setting('app.tenant_id', true), '')::uuid`,
+    withCheck: sql`tenant_id = nullif(current_setting('app.tenant_id', true), '')::uuid`,
+  }),
+]).enableRLS();
+
+export const membershipRoleAssignments = pgTable('membership_role_assignments', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  membershipId: uuid('membership_id').notNull(),
+  roleId: uuid('role_id').notNull(),
+  scopeKind: text('scope_kind').notNull(),
+  schoolId: uuid('school_id'),
+  campusId: uuid('campus_id'),
+  createdByAccountId: uuid('created_by_account_id').references(() => accounts.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  unique('membership_role_assignments_grant_unique')
+    .on(table.tenantId, table.membershipId, table.roleId, table.scopeKind, table.schoolId, table.campusId)
+    .nullsNotDistinct(),
+  index('membership_role_assignments_membership_idx').on(table.tenantId, table.membershipId),
+  foreignKey({
+    columns: [table.tenantId, table.membershipId],
+    foreignColumns: [memberships.tenantId, memberships.id],
+    name: 'membership_role_assignments_tenant_membership_fk',
+  }).onDelete('cascade'),
+  foreignKey({
+    columns: [table.tenantId, table.roleId],
+    foreignColumns: [authorizationRoles.tenantId, authorizationRoles.id],
+    name: 'membership_role_assignments_tenant_role_fk',
+  }).onDelete('cascade'),
+  foreignKey({
+    columns: [table.tenantId, table.schoolId],
+    foreignColumns: [schools.tenantId, schools.id],
+    name: 'membership_role_assignments_tenant_school_fk',
+  }).onDelete('cascade'),
+  foreignKey({
+    columns: [table.tenantId, table.schoolId, table.campusId],
+    foreignColumns: [campuses.tenantId, campuses.schoolId, campuses.id],
+    name: 'membership_role_assignments_tenant_campus_fk',
+  }).onDelete('cascade'),
+  check('membership_role_assignments_scope_shape_check', sql`
+    (scope_kind = 'tenant' and school_id is null and campus_id is null)
+    or (scope_kind = 'school' and school_id is not null and campus_id is null)
+    or (scope_kind = 'campus' and school_id is not null and campus_id is not null)
+  `),
+  pgPolicy('membership_role_assignments_tenant_isolation', {
+    for: 'all',
+    to: 'public',
+    using: sql`tenant_id = nullif(current_setting('app.tenant_id', true), '')::uuid`,
+    withCheck: sql`tenant_id = nullif(current_setting('app.tenant_id', true), '')::uuid`,
+  }),
+]).enableRLS();
