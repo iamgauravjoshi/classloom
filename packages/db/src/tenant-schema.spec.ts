@@ -55,7 +55,7 @@ describe('tenant schema', () => {
   });
 
   it.skipIf(!process.env.DATABASE_MIGRATION_URL)(
-    'migrates forced RLS policies for schools and campuses',
+    'migrates forced RLS policies for every tenant-owned base and authorization table',
     async () => {
       const client = postgres(process.env.DATABASE_MIGRATION_URL!, { max: 1 });
       try {
@@ -72,12 +72,15 @@ describe('tenant schema', () => {
           from pg_class c
           join pg_namespace n on n.oid = c.relnamespace
           where n.nspname = current_schema()
-            and c.relname in ('schools', 'campuses')
+            and c.relname in ('schools', 'campuses', 'authorization_roles', 'authorization_role_permissions', 'membership_role_assignments')
           order by c.relname
         `;
 
         expect(rows).toEqual([
+          { tablename: 'authorization_role_permissions', rowsecurity: true, force_rls: true, tenant_policy: true },
+          { tablename: 'authorization_roles', rowsecurity: true, force_rls: true, tenant_policy: true },
           { tablename: 'campuses', rowsecurity: true, force_rls: true, tenant_policy: true },
+          { tablename: 'membership_role_assignments', rowsecurity: true, force_rls: true, tenant_policy: true },
           { tablename: 'schools', rowsecurity: true, force_rls: true, tenant_policy: true },
         ]);
       } finally {
@@ -99,7 +102,7 @@ describe('tenant schema', () => {
               select 1 from pg_class c
               join pg_namespace n on n.oid = c.relnamespace
               where n.nspname = current_schema()
-                and c.relname in ('schools', 'campuses')
+                and c.relname in ('schools', 'campuses', 'authorization_roles', 'authorization_role_permissions', 'membership_role_assignments')
                 and c.relowner = r.oid
             ) as owns_tenant_tables
           from pg_roles r
@@ -114,3 +117,4 @@ describe('tenant schema', () => {
     },
   );
 });
+

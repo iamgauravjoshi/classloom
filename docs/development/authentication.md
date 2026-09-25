@@ -43,3 +43,5 @@ pnpm --filter @classloom/api auth:bootstrap-admin -- <tenant-id> person@example.
 ```
 
 The CLI uses the application's restricted runtime database URL, grants only the built-in tenant administrator role at tenant scope, and records a trusted-bootstrap audit event. Repeating it is safe.
+
+Protected API routes declare permissions with `@RequirePermissions('authorization.roles.read')`; keep `AuthGuard` before `AuthorizationGuard`. Resolve tenant and active membership only from `request.auth`, and use a server-side resource resolver to supply a school or campus scope for resource routes. Until academic and relationship resolvers exist, those requests must deny access.

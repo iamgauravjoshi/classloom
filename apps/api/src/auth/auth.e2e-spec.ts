@@ -34,7 +34,7 @@ describe('authentication API', () => {
     if (!integrationEnabled) return;
     admin = postgres(adminUrl!, { max: 1 });
     const module = await Test.createTestingModule({ imports: [AppModule] })
-      .overrideProvider(AUTH_CONFIG).useValue(parseEnv({ DATABASE_URL: runtimeUrl!, AUTH_LOGIN_LIMIT: '100' }))
+      .overrideProvider(AUTH_CONFIG).useValue(parseEnv({ DATABASE_URL: runtimeUrl!, AUTH_LOGIN_LIMIT: '100', AUTH_RESET_LIMIT: '100', AUTH_INVITATION_LIMIT: '100', AUTH_RATE_LIMIT_KEY: randomUUID() }))
       .overrideProvider(EmailService).useValue({
         sendInvitation: async (_email: string, token: string) => { emailedTokens.push(token); },
         sendPasswordReset: async (_email: string, token: string) => { emailedTokens.push(token); },
@@ -231,3 +231,4 @@ describe('authentication API', () => {
     await admin?.end();
   });
 });
+

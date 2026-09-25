@@ -121,8 +121,12 @@ describe.skipIf(!enabled)('authorization administration API', () => {
     `;
     expect(events).toEqual([{ eventType: 'tenant_admin_bootstrapped', source: 'trusted_bootstrap_cli' }]);
   });
+  it('rejects authorization from a still-valid session after membership suspension', async () => {
+    await admin`update memberships set status = 'suspended' where id = ${memberMembershipId}`;
+    const session = await request(app.getHttpServer()).get('/api/v1/auth/session').set('Cookie', memberCookie);
+    expect(session.status).toBe(401);
+    const protectedRoles = await request(app.getHttpServer()).get('/api/v1/authorization/roles').set('Cookie', memberCookie);
+    expect(protectedRoles.status).toBe(401);
+  });
 });
-
-
-
 
