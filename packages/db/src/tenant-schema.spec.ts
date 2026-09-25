@@ -31,6 +31,10 @@ describe('tenant schema', () => {
     expect(dbExports).toHaveProperty('campuses');
   });
 
+  it('does not expose privileged runtime-role setup through the public package entrypoint', () => {
+    expect(dbExports).not.toHaveProperty('setupRuntimeRole');
+  });
+
   it('declares tenant RLS policies for schools and campuses', () => {
     for (const tableName of ['schools', 'campuses'] as const) {
       const tableConfig = getTableConfig(schemaExports[tableName] as never);
