@@ -1,8 +1,11 @@
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 
-export function createDb(databaseUrl: string) {
-  const client = postgres(databaseUrl, { max: 10 });
+export type AppDb = ReturnType<typeof drizzle>;
+export type TenantTransaction = Parameters<Parameters<AppDb['transaction']>[0]>[0];
+
+export function createDb(databaseUrl: string, options: { maxConnections?: number } = {}) {
+  const client = postgres(databaseUrl, { max: options.maxConnections ?? 10 });
   return { db: drizzle(client), close: () => client.end() };
 }
 

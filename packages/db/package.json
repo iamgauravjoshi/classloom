@@ -8,6 +8,8 @@
   "scripts": {
     "generate": "drizzle-kit generate",
     "migrate": "tsx src/migrate.ts",
+    "setup-runtime-role": "tsx src/setup-runtime-role.ts",
+    "provision-tenant": "tsx src/provision-tenant.ts",
     "check": "tsx src/check.ts",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",

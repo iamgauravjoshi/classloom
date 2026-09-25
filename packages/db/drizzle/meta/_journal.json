@@ -8,6 +8,20 @@
       "when": 1790297459089,
       "tag": "0000_even_texas_twister",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790317165706,
+      "tag": "0001_bright_black_queen",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790319822253,
+      "tag": "0002_omniscient_quentin_quire",
+      "breakpoints": true
     }
   ]
 }

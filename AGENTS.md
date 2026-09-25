@@ -9,7 +9,7 @@ This pnpm workspace contains `apps/web` (Next.js UI), `apps/api` (NestJS API), a
 Use Node.js 24.15+ and pnpm 11.19. From the repository root:
 
 - `pnpm install` installs workspace dependencies.
-- Copy `.env.example` to `.env`, run `docker compose up -d db`, then `pnpm db:migrate` to prepare local PostgreSQL.
+- Copy `.env.example` to `.env`, run `docker compose up -d db`, then `pnpm db:setup-runtime-role` and `pnpm db:migrate` to prepare local PostgreSQL.
 - `pnpm dev` starts the web app and API at ports 3000 and 4000.
 - `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `pnpm build` run checks across all workspace packages.
 - `pnpm db:generate` creates a migration after schema changes; `pnpm db:check` checks database connectivity.

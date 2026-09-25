@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "campuses_tenant_id_id_unique" ON "campuses" USING btree ("tenant_id","id");
