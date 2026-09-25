@@ -20,7 +20,10 @@ jobs:
           --health-timeout 3s
           --health-retries 10
     env:
-      DATABASE_URL: postgresql://classloom:classloom_dev@localhost:5432/classloom
+      DATABASE_URL: postgresql://classloom_runtime:classloom_runtime_dev@localhost:5432/classloom
+      DATABASE_MIGRATION_URL: postgresql://classloom:classloom_dev@localhost:5432/classloom
+      DATABASE_PROVISIONER_URL: postgresql://classloom:classloom_dev@localhost:5432/classloom
+      DATABASE_RUNTIME_PASSWORD: classloom_runtime_dev
       API_PORT: 4000
       WEB_ORIGIN: http://localhost:3000
     steps:
@@ -32,6 +35,8 @@ jobs:
         with:
           version: 11.19.0
       - run: pnpm install --frozen-lockfile
+      - run: pnpm db:setup-runtime-role
+      - run: pnpm db:migrate
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
