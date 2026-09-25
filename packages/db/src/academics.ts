@@ -10,19 +10,19 @@ export class AcademicSetupError extends Error {
 
 export function validateAcademicCode(value: string): string {
   const code = value.trim().toUpperCase();
-  if (!/^[A-Z0-9][A-Z0-9_-]{0,19}$/.test(code)) throw new Error('Code must be 1–20 letters, numbers, hyphens or underscores');
+  if (!/^[A-Z0-9][A-Z0-9_-]{0,19}$/.test(code)) throw new AcademicSetupError('INVALID', 'Code must be 1–20 letters, numbers, hyphens or underscores');
   return code;
 }
 
 export function validateAcademicSession(input: AcademicSessionInput): AcademicSessionInput {
   const name = input.name.trim();
-  if (name.length < 2 || name.length > 120) throw new Error('Session name must be 2–120 characters');
+  if (name.length < 2 || name.length > 120) throw new AcademicSetupError('INVALID', 'Session name must be 2–120 characters');
   const code = validateAcademicCode(input.code);
   const datePattern = /^\d{4}-\d{2}-\d{2}$/;
   const validDate = (value: string) => datePattern.test(value) &&
     Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value;
   if (!validDate(input.startDate) || !validDate(input.endDate) ||
-    input.endDate <= input.startDate) throw new Error('Session end date must follow start date');
+    input.endDate <= input.startDate) throw new AcademicSetupError('INVALID', 'Session end date must follow start date');
   return { name, code, startDate: input.startDate, endDate: input.endDate };
 }
 
@@ -123,8 +123,9 @@ export async function createAcademicAssignment(tx: TenantTransaction, scope: Sco
     eq(academicSubjects.tenantId, scope.tenantId), eq(academicSubjects.schoolId, scope.schoolId),
     eq(academicSubjects.sessionId, section.sessionId), eq(academicSubjects.id, input.subjectId),
   )).limit(1);
-  const [member] = await tx.select({ id: memberships.id }).from(memberships).where(and(
-    eq(memberships.tenantId, scope.tenantId), eq(memberships.id, input.membershipId), eq(memberships.status, 'active'),
+  const [member] = await tx.select({ id: memberships.id }).from(memberships)
+    .innerJoin(accounts, eq(memberships.accountId, accounts.id)).where(and(
+    eq(memberships.tenantId, scope.tenantId), eq(memberships.id, input.membershipId), eq(memberships.status, 'active'), eq(accounts.status, 'active'),
   )).limit(1);
   const [schoolGrant] = await tx.select({ id: membershipRoleAssignments.id }).from(membershipRoleAssignments).where(and(
     eq(membershipRoleAssignments.tenantId, scope.tenantId), eq(membershipRoleAssignments.membershipId, input.membershipId),

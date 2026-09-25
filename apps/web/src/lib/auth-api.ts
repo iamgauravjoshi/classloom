@@ -1,3 +1,5 @@
+import { responseError } from "./api-error";
+
 const API_ORIGIN = process.env.API_INTERNAL_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api/v1";
 const BROWSER_AUTH_PREFIX = "/api/auth";
 
@@ -19,7 +21,7 @@ export async function authRequest<T>(path: string, body?: Record<string, string 
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(typeof payload.message === "string" ? payload.message : "The request could not be completed.");
+    throw responseError(payload);
   }
   return payload as T;
 }

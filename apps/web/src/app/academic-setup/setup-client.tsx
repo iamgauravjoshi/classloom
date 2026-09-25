@@ -15,6 +15,8 @@ import {
   getAcademicSetup, listAcademicSchools, listAcademicStaff,
   type AcademicSchool, type AcademicSetup, type AcademicStaffAccount,
 } from "@/lib/academics-api";
+import { switchAcademicSession } from "@/lib/academic-selection";
+import { toast } from "@/components/ui/toast";
 
 function errorMessage(error: unknown) { return error instanceof Error ? error.message : "The request could not be completed"; }
 
@@ -69,7 +71,7 @@ export function AcademicSetupClient() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
-  useEffect(() => { listAcademicSchools().then((items) => { setSchools(items); setSchoolId(items[0]?.id ?? ""); }).catch((cause) => setError(errorMessage(cause))); }, []);
+  useEffect(() => { listAcademicSchools().then((items) => { setSchools(items); setSchoolId(items[0]?.id ?? ""); }).catch((cause) => { const detail = errorMessage(cause); setError(detail); toast.add({ type: "error", title: "Could not load schools", description: detail, priority: "high" }); }); }, []);
   const refresh = useCallback(async (id: string) => {
     const [result, members] = await Promise.all([getAcademicSetup(id), listAcademicStaff(id)]);
     setSetup(result); setStaff(members);
@@ -83,7 +85,7 @@ export function AcademicSetupClient() {
       setSetup(result); setStaff(members);
       setSessionId(result.sessions.find((item) => item.status === "active")?.id ?? result.sessions.find((item) => item.status === "draft")?.id ?? "");
       setClassId(""); setSectionId(""); setSubjectId(""); setMembershipId("");
-    }).catch((cause) => { if (!cancelled) setError(errorMessage(cause)); });
+    }).catch((cause) => { if (!cancelled) { const detail = errorMessage(cause); setError(detail); toast.add({ type: "error", title: "Could not load academic setup", description: detail, priority: "high" }); } });
     return () => { cancelled = true; };
   }, [schoolId]);
 
@@ -97,8 +99,8 @@ export function AcademicSetupClient() {
   async function mutate(work: () => Promise<unknown>, message: string) {
     if (!schoolId) return false;
     setBusy(true); setError(""); setNotice("");
-    try { await work(); await refresh(schoolId); setNotice(message); return true; }
-    catch (cause) { setError(errorMessage(cause)); return false; }
+    try { await work(); await refresh(schoolId); setNotice(message); toast.add({ type: "success", title: "Saved", description: message }); return true; }
+    catch (cause) { const detail = errorMessage(cause); setError(detail); toast.add({ type: "error", title: "Could not save changes", description: detail, priority: "high" }); return false; }
     finally { setBusy(false); }
   }
 
@@ -114,7 +116,7 @@ export function AcademicSetupClient() {
     {schools.length > 0 && <Card><CardHeader><CardTitle>School and academic session</CardTitle><CardDescription>Choose a school and the session to configure.</CardDescription></CardHeader>
       <CardContent><div className="grid gap-4 md:grid-cols-2">
         <Choice label="School" value={schoolId} onChange={setSchoolId} options={schools.map((item) => ({ id: item.id, name: item.name }))} placeholder="Select school" />
-        <Choice label="Academic session" value={sessionId} onChange={setSessionId} options={(setup?.sessions ?? []).map((item) => ({ id: item.id, name: `${item.name} · ${item.status}` }))} placeholder="Create a session" />
+        <Choice label="Academic session" value={sessionId} onChange={(value) => { const next = switchAcademicSession(value); setSessionId(next.sessionId); setClassId(next.classId); setSectionId(next.sectionId); setSubjectId(next.subjectId); setMembershipId(next.membershipId); }} options={(setup?.sessions ?? []).map((item) => ({ id: item.id, name: `${item.name} · ${item.status}` }))} placeholder="Create a session" />
       </div></CardContent></Card>}
     {schoolId && <div className="grid gap-5 lg:grid-cols-2">
       <Card><CardHeader><CardTitle>New academic session</CardTitle><CardDescription>Set the calendar dates for a school year.</CardDescription></CardHeader>

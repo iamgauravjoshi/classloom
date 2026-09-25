@@ -18,3 +18,4 @@
 2. Write failing API tests for authorization, validation and operations. Add the academics Nest module and endpoints, then pass tests.
 3. Read local Next App Router docs. Write UI tests for academic API helpers and configuration state. Build the setup page using existing shell and shadcn components, then pass tests.
 4. Update architecture, API and local setup documentation. Verify migration, lint, typecheck, tests, E2E and build. Review the branch and fix issues.
+5. Address the final review findings and add clear validation responses and animated feedback across authentication and academic forms. Re-run all gates before committing the fix pass.

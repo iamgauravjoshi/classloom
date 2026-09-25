@@ -181,6 +181,23 @@ describe('authentication API', () => {
     expect(created.id).toBeTruthy();
   });
 
+  it.skipIf(!integrationEnabled)('explains a short invitation password without consuming the invitation', async () => {
+    const token = app!.get(TokenService).createOpaqueToken();
+    const invitationEmail = `short-password-${randomUUID()}@example.test`;
+    await createMembershipInvitation(app!.get(DatabaseService).db, {
+      tenantId: tenantA, email: invitationEmail, tokenHash: token.hash, expiresAt: new Date(Date.now() + 60_000),
+    });
+    const response = await request(app!.getHttpServer()).post('/api/v1/auth/invitations/accept')
+      .set(browserHeaders).send({ token: token.raw, password: 'too-short' });
+    expect(response.status).toBe(400);
+    expect(response.body.message).toMatch(/at least 15 characters/i);
+    expect(response.body.details.fields.password).toMatch(/at least 15 characters/i);
+    const accepted = await request(app!.getHttpServer()).post('/api/v1/auth/invitations/accept')
+      .set(browserHeaders).send({ token: token.raw, password: 'a secure invitation password' });
+    expect(accepted.status).toBe(200);
+    await admin!`delete from accounts where normalized_email = ${invitationEmail}`;
+  });
+
   it.skipIf(!integrationEnabled)('lets an authenticated existing account accept and activate another workspace', async () => {
     const token = new TokenService().createOpaqueToken();
     await createMembershipInvitation(app!.get(DatabaseService).db, {

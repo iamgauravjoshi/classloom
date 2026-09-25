@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Get,
@@ -23,21 +22,22 @@ import type { AuthenticatedRequest } from './auth.types.js';
 import { readSessionCookie } from './session-cookie.js';
 import { IdentityFlowService } from './identity-flow.service.js';
 import { validatePassword } from './password.service.js';
+import { parseRequest } from '../common/request-validation.js';
 
-const passwordSchema = z.string().max(1024).refine((value) => validatePassword(value).success);
-const loginPasswordSchema = z.string().min(1).max(1024).refine((value) => Array.from(value).length <= 256);
-const loginSchema = z.object({ email: z.string().trim().email().max(254), password: loginPasswordSchema });
+const passwordSchema = z.string().max(1024).superRefine((value, context) => {
+  const result = validatePassword(value);
+  if (!result.success) context.addIssue({ code: 'custom', message: result.message });
+});
+const loginPasswordSchema = z.string().min(1, 'Enter your password').max(1024).refine((value) => Array.from(value).length <= 256, 'Password is too long');
+const loginSchema = z.object({ email: z.email('Enter a valid email address').max(254), password: loginPasswordSchema });
 const membershipSchema = z.object({ membershipId: z.string().uuid() });
-const invitationAcceptanceSchema = z.object({ token: z.string().min(32).max(256), password: passwordSchema, displayName: z.string().trim().max(120).optional().transform((value) => value || undefined) });
-const existingInvitationSchema = z.object({ token: z.string().min(32).max(256) });
-const resetRequestSchema = z.object({ email: z.string().trim().email().max(254) });
-const resetConfirmSchema = z.object({ token: z.string().min(32).max(256), password: passwordSchema });
+const tokenSchema = z.string().min(32, 'This link is incomplete or invalid').max(256, 'This link is invalid');
+const invitationAcceptanceSchema = z.object({ token: tokenSchema, password: passwordSchema, displayName: z.string().trim().max(120).optional().transform((value) => value || undefined) });
+const existingInvitationSchema = z.object({ token: tokenSchema });
+const resetRequestSchema = z.object({ email: z.email('Enter a valid email address').max(254) });
+const resetConfirmSchema = z.object({ token: tokenSchema, password: passwordSchema });
 
-function parseBody<T>(schema: z.ZodType<T>, input: unknown): T {
-  const result = schema.safeParse(input);
-  if (!result.success) throw new BadRequestException('Invalid request');
-  return result.data;
-}
+const parseBody = parseRequest;
 
 function cookieOptions(config: AuthConfiguration) {
   return {

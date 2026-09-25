@@ -11,6 +11,7 @@ Give an authorized school administrator a working setup flow for academic sessio
 - Codes are unique within their parent (session for classes and subjects; class for sections). Names and codes are trimmed and bounded. Assignments are unique per section and subject. A subject must be in the same session as its section; a membership must be active in the same tenant.
 - Tenant isolation is enforced with PostgreSQL RLS on every table and composite foreign keys for every academic relationship. The API derives tenant identity from the server session, checks `school.read` or `school.manage` against the requested school, and never trusts a client supplied tenant ID.
 - School setup UI uses the existing ClassLoom shell and shadcn components, following the live PreSkool page structure. It displays active session, setup lists and creation forms, validation feedback, and activation confirmation.
+- Forms retain readable inline errors and also show animated success or error toasts. API validation failures include field messages; the browser checks password length before invitation or reset submission and the API enforces the same policy.
 
 ## API
 

@@ -11,7 +11,7 @@ export class HttpExceptionEnvelopeFilter implements ExceptionFilter {
     const raw = exception instanceof HttpException ? exception.getResponse() : null;
     const detail = typeof raw === 'object' && raw && 'message' in raw ? raw.message : null;
     const message = status >= 500
-      ? 'Internal server error'
+      ? 'Something went wrong. Please try again later.'
       : typeof detail === 'string'
         ? detail
         : exception instanceof Error
@@ -19,6 +19,8 @@ export class HttpExceptionEnvelopeFilter implements ExceptionFilter {
           : 'Request failed';
     const code = status === 404 ? 'NOT_FOUND' : status === 400 ? 'BAD_REQUEST' : status >= 500 ? 'INTERNAL_ERROR' : `HTTP_${status}`;
 
-    response.status(status).json({ code, message, details: {}, requestId: request.requestId ?? null });
+    const details = status < 500 && typeof raw === 'object' && raw && 'details' in raw &&
+      typeof raw.details === 'object' && raw.details ? raw.details : {};
+    response.status(status).json({ code, message, details, requestId: request.requestId ?? null });
   }
 }

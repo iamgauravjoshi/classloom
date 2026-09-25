@@ -33,6 +33,7 @@ import { DatabaseService } from '../database/database.service.js';
 import { AuthorizationGuard } from './authorization.guard.js';
 import { RequirePermissions } from './require-permissions.decorator.js';
 import { z } from 'zod';
+import { parseRequest } from '../common/request-validation.js';
 
 const uuid = z.string().uuid();
 const scopeSchema = z.discriminatedUnion('kind', [
@@ -49,11 +50,7 @@ const createRoleSchema = z.object({
 });
 const assignSchema = z.object({ membershipId: uuid, roleId: uuid, scope: scopeSchema }).strict();
 
-function parse<T>(schema: z.ZodType<T>, value: unknown): T {
-  const parsed = schema.safeParse(value);
-  if (!parsed.success) throw new BadRequestException('Invalid request');
-  return parsed.data;
-}
+const parse = parseRequest;
 
 function tenantContext(request: AuthenticatedRequest) {
   const auth = request.auth;

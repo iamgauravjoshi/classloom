@@ -23,10 +23,12 @@ describe.skipIf(!enabled)('academic setup API', () => {
   const foreignTenantId = randomUUID();
   const email = `academic-admin-${randomUUID()}@example.test`;
   const ordinaryEmail = `academic-member-${randomUUID()}@example.test`;
+  const disabledEmail = `academic-disabled-${randomUUID()}@example.test`;
   const password = 'a secure long passphrase';
   let cookie: string;
   let ordinaryCookie: string;
   let administratorMembershipId: string;
+  let disabledMembershipId: string;
 
   beforeAll(async () => {
     admin = postgres(process.env.DATABASE_MIGRATION_URL!, { max: 1 });
@@ -43,8 +45,12 @@ describe.skipIf(!enabled)('academic setup API', () => {
     const administrator = await createAccountWithMembership(db, { email, passwordHash: hash, tenantId });
     administratorMembershipId = administrator.membershipId;
     await createAccountWithMembership(db, { email: ordinaryEmail, passwordHash: hash, tenantId });
+    const disabledMember = await createAccountWithMembership(db, { email: disabledEmail, passwordHash: hash, tenantId });
+    disabledMembershipId = disabledMember.membershipId;
     const [role] = await admin<{ id: string }[]>`select id from authorization_roles where tenant_id = ${tenantId} and system_key = 'tenant_admin'`;
     await admin`insert into membership_role_assignments (tenant_id, membership_id, role_id, scope_kind) values (${tenantId}, ${administrator.membershipId}, ${role!.id}, 'tenant')`;
+    await admin`insert into membership_role_assignments (tenant_id, membership_id, role_id, scope_kind) values (${tenantId}, ${disabledMembershipId}, ${role!.id}, 'tenant')`;
+    await admin`update accounts set status = 'disabled' where normalized_email = ${disabledEmail}`;
     const login = await request(app.getHttpServer()).post('/api/v1/auth/login').set(headers).send({ email, password });
     cookie = (login.headers['set-cookie'] as unknown as string[])[0]!.split(';', 1)[0]!;
     const ordinaryLogin = await request(app.getHttpServer()).post('/api/v1/auth/login').set(headers).send({ email: ordinaryEmail, password });
@@ -54,7 +60,7 @@ describe.skipIf(!enabled)('academic setup API', () => {
   afterAll(async () => {
     if (admin) {
       await admin`delete from tenants where id in (${tenantId}, ${foreignTenantId})`;
-      await admin`delete from accounts where normalized_email in (${email}, ${ordinaryEmail})`;
+      await admin`delete from accounts where normalized_email in (${email}, ${ordinaryEmail}, ${disabledEmail})`;
       await admin.end();
     }
     await app?.close();
@@ -87,6 +93,8 @@ describe.skipIf(!enabled)('academic setup API', () => {
     const staff = await request(app.getHttpServer()).get(`${base}/staff`).set('Cookie', cookie);
     expect(staff.status).toBe(200);
     expect(staff.body).toEqual([expect.objectContaining({ id: administratorMembershipId })]);
+    const disabledAssignment = await request(app.getHttpServer()).post(`${base}/sections/${section.body.id}/assignments`).set({ ...headers, Cookie: cookie }).send({ subjectId: subject.body.id, membershipId: disabledMembershipId });
+    expect(disabledAssignment.status).toBe(404);
     const assignment = await request(app.getHttpServer()).post(`${base}/sections/${section.body.id}/assignments`).set({ ...headers, Cookie: cookie }).send({ subjectId: subject.body.id, membershipId: administratorMembershipId });
     expect(assignment.status).toBe(201);
     const duplicate = await request(app.getHttpServer()).post(`${base}/sections/${section.body.id}/assignments`).set({ ...headers, Cookie: cookie }).send({ subjectId: subject.body.id, membershipId: administratorMembershipId });
@@ -97,5 +105,17 @@ describe.skipIf(!enabled)('academic setup API', () => {
     const setup = await request(app.getHttpServer()).get(`${base}/setup`).set('Cookie', cookie);
     expect(setup.status).toBe(200);
     expect(setup.body).toMatchObject({ school: { id: schoolId }, sessions: [expect.objectContaining({ status: 'active' })] });
+  });
+
+  it('returns useful client errors for invalid academic data', async () => {
+    const base = `/api/v1/academics/schools/${schoolId}`;
+    const invalidCode = await request(app.getHttpServer()).post(`${base}/sessions`).set({ ...headers, Cookie: cookie })
+      .send({ name: 'Another year', code: 'BAD CODE', startDate: '2028-04-01', endDate: '2029-03-31' });
+    expect(invalidCode.status).toBe(400);
+    expect(invalidCode.body.message).toMatch(/code/i);
+    const reversed = await request(app.getHttpServer()).post(`${base}/sessions`).set({ ...headers, Cookie: cookie })
+      .send({ name: 'Another year', code: '2028', startDate: '2029-04-01', endDate: '2028-03-31' });
+    expect(reversed.status).toBe(400);
+    expect(reversed.body.message).toMatch(/end date/i);
   });
 });

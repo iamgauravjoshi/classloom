@@ -7,6 +7,7 @@ import { AuthGuard } from '../auth/auth.guard.js';
 import { CsrfGuard } from '../auth/csrf.guard.js';
 import { AuthorizationService } from '../authorization/authorization.service.js';
 import { DatabaseService } from '../database/database.service.js';
+import { parseRequest } from '../common/request-validation.js';
 
 const uuid = z.string().uuid();
 const named = z.object({ name: z.string().trim().min(2).max(120), code: z.string().trim().min(1).max(20) }).strict();
@@ -15,11 +16,7 @@ const classInput = named.extend({ sortOrder: z.number().int().min(0).max(999).op
 const sectionInput = named.extend({ capacity: z.number().int().positive().max(1000).optional() });
 const assignmentInput = z.object({ subjectId: uuid, membershipId: uuid }).strict();
 
-function parse<T>(schema: z.ZodType<T>, value: unknown): T {
-  const result = schema.safeParse(value);
-  if (!result.success) throw new BadRequestException('Invalid academic setup input');
-  return result.data;
-}
+const parse = parseRequest;
 
 function mapError(error: unknown): never {
   if (error instanceof AcademicSetupError) {

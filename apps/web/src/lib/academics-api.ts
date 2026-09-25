@@ -1,3 +1,5 @@
+import { responseError } from "./api-error";
+
 const prefix = "/api/academics";
 
 export type AcademicSchool = { id: string; name: string; code: string };
@@ -17,7 +19,7 @@ async function request<T>(path: string, body?: Record<string, string | number | 
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(typeof data.message === "string" ? data.message : "Academic setup could not be saved");
+  if (!response.ok) throw responseError(data, "Academic setup could not be saved. Please try again.");
   return data as T;
 }
 

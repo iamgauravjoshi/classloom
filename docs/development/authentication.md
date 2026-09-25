@@ -28,6 +28,8 @@ Browser writes use exact-origin validation and the `X-ClassLoom-Request: 1` mark
 
 Browser authentication calls go through the same-origin Next.js `/api/auth/*` proxy. It forwards the host-only session cookie to the API and reissues `Set-Cookie` on the web host so dashboard server rendering can validate sessions when the API uses a different hostname. Set `API_INTERNAL_URL` to the private API base URL; keep `NEXT_PUBLIC_API_URL` only for compatibility with direct local API tooling. In deployments behind a known reverse proxy, set `TRUSTED_PROXY_HOPS` to the exact proxy hop count so source-based throttling uses the client address. The edge proxy must overwrite forwarded-address headers.
 
+Invitation acceptance and password reset validate the 15–256 character password policy in the browser and again on the API. Validation responses include a readable `message` and `details.fields` keyed by form field; the web form shows the field message and an animated toast. Invalid or used invitation links receive a link-specific error. Sign-in failures continue to use the same message for an unknown email and a wrong password. Internal server details remain hidden from browser responses.
+
 ## Verify
 
 Run `pnpm --filter @classloom/db test` and `pnpm --filter @classloom/api test`; PostgreSQL integration tests run when both `DATABASE_URL` and `DATABASE_MIGRATION_URL` are set. Then run `pnpm test:e2e`, `pnpm typecheck`, `pnpm lint`, and `pnpm build`.

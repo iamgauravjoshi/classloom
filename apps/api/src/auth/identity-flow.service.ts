@@ -42,7 +42,7 @@ export class IdentityFlowService {
 
   async acceptNewInvitation(rawToken: string, password: string, displayName?: string, source = 'unknown') {
     const limit = await this.repository.consumeRateLimit({ scope: 'invitation', subjectDigest: this.digest(source), ...this.config.rateLimits.invitation });
-    if (!limit.allowed) throw new BadRequestException('Invitation could not be accepted');
+    if (!limit.allowed) throw new BadRequestException('Too many invitation attempts. Please wait before trying again.');
     const tokenHash = this.tokens.hashToken(rawToken);
     try {
       const passwordHash = await this.passwords.hash(password);
@@ -50,21 +50,21 @@ export class IdentityFlowService {
       await this.repository.recordSecurityEvent({ eventType: 'invitation_accepted', accountId: result.account.id, tenantId: result.membership.tenantId });
       return { accepted: true };
     } catch (error) {
-      if (error instanceof InvitationError) throw new BadRequestException('Invitation could not be accepted');
+      if (error instanceof InvitationError) throw new BadRequestException('This invitation link is invalid, expired, or already used.');
       throw error;
     }
   }
 
   async acceptExistingInvitation(rawToken: string, accountId: string, sessionId: string, source = 'unknown', requestId?: string) {
     const limit = await this.repository.consumeRateLimit({ scope: 'invitation', subjectDigest: this.digest(source), ...this.config.rateLimits.invitation });
-    if (!limit.allowed) throw new BadRequestException('Invitation could not be accepted');
+    if (!limit.allowed) throw new BadRequestException('Too many invitation attempts. Please wait before trying again.');
     try {
       const membership = await this.repository.acceptExistingAccountInvitation(this.tokens.hashToken(rawToken), accountId);
       await this.repository.selectSessionMembership(accountId, sessionId, membership.id);
       await this.repository.recordSecurityEvent({ eventType: 'invitation_accepted', accountId, tenantId: membership.tenantId, requestId });
       return { accepted: true };
     } catch (error) {
-      if (error instanceof InvitationError) throw new BadRequestException('Invitation could not be accepted');
+      if (error instanceof InvitationError) throw new BadRequestException('This invitation link is invalid, expired, or already used.');
       throw error;
     }
   }
