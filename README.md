@@ -26,7 +26,7 @@ Each tenant is isolated and can own multiple schools; each school can have multi
 
 ClassLoom is being developed incrementally, with each major feature documented, designed, implemented, tested, and integrated into the broader architecture.
 
-The foundation includes tenant-isolated PostgreSQL data, email/password accounts with server-side sessions, and tenant-scoped roles and permissions. Authorization checks use the active membership from the session; school and campus checks require a server-resolved resource scope. Phase 4 adds school-scoped academic sessions, classes, sections, subjects, teacher assignments, and activation. Academic setup uses `school.read` and `school.manage` against the requested school. The separate academic and person-relationship permission scopes remain denied until their modules provide resource resolvers.
+The foundation includes tenant-isolated PostgreSQL data, email/password accounts with server-side sessions, and tenant-scoped roles and permissions. Authorization checks use the active membership from the session; school and campus checks require a server-resolved resource scope. Phase 4 adds school-scoped academic sessions, classes, sections, subjects, teacher assignments, and activation. Phase 5 adds one tenant-wide staff profile per person, separate school affiliations, optional teacher details, and optional account links. The `/staff` directory uses school-scoped `staff.read` and `staff.manage`; new academic assignments require a linked active teacher. See [staff and teacher development](docs/development/staff-teachers.md) for workflows and [ADR-0004](docs/decisions/ADR-0004-shared-staff-profiles.md) for the data model. Academic setup uses `school.read` and `school.manage` against the requested school. The separate academic and person-relationship permission scopes remain denied until their modules provide resource resolvers.
 
 ---
 
@@ -534,6 +534,8 @@ API:             http://localhost:4000
 The API health endpoint is `http://localhost:4000/api/v1/health`; OpenAPI documentation is at `http://localhost:4000/api/docs`.
 
 Mailpit captures development email at [http://localhost:8025](http://localhost:8025). To create a local administrator, invite an account with `pnpm --filter @classloom/api auth:invite -- <tenant-id> <email>`, accept the invitation, then grant the first tenant administrator with `pnpm --filter @classloom/api auth:bootstrap-admin -- <tenant-id> <email>`. See [authentication development](docs/development/authentication.md) for details.
+
+After migrations, sign in as an administrator and open [Staff & Teachers](http://localhost:3000/staff) to add staff, manage school affiliations, and link eligible accounts. A profile alone does not create a login. [Staff and teacher setup](docs/development/staff-teachers.md) covers the complete flow.
 
 ---
 
