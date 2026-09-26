@@ -18,16 +18,18 @@ export function ConfirmationDialog({
   description,
   confirmLabel,
   onConfirm,
+  disabled = false,
 }: {
   triggerLabel: string;
   title: string;
   description: string;
   confirmLabel: string;
   onConfirm: () => void;
+  disabled?: boolean;
 }) {
   return (
     <Dialog>
-      <DialogTrigger render={<Button variant="outline" />}>
+      <DialogTrigger render={<Button disabled={disabled} />}>
         {triggerLabel}
       </DialogTrigger>
       <DialogContent>

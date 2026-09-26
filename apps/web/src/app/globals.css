@@ -954,7 +954,6 @@
 .auth-card h1 { margin: 0; color: var(--foreground); font-size: 26px; letter-spacing: -.035em; }
 .auth-description { margin: 9px 0 25px; color: var(--text-secondary); font-size: 14px; line-height: 1.55; }
 .auth-form { display: grid; gap: 18px; }
-.auth-form label { display: grid; gap: 8px; color: var(--foreground); font-size: 13px; font-weight: 650; }
 .auth-form input { height: 42px; }
 .auth-submit { width: 100%; height: 42px; margin-top: 3px; background: #3267e9; color: white; }
 .auth-links { display: flex; justify-content: center; margin-top: 22px; font-size: 13px; }
@@ -969,6 +968,4 @@
 .workspace-choice { min-height: 62px; display: flex; justify-content: flex-start; gap: 12px; padding: 10px 14px; text-align: left; }
 .workspace-choice > span:last-child { display: grid; gap: 3px; }
 .workspace-choice small { color: var(--text-secondary); font-size: 11px; }
-.logout-button { display: grid; place-items: center; width: 34px; height: 34px; margin-left: 4px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: var(--text-secondary); cursor: pointer; }
-.logout-button:hover { background: var(--muted); color: var(--foreground); }
 @media (max-width: 520px) { .auth-card { padding: 28px 22px; } }

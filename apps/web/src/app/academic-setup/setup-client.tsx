@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useId, useState, type FormEvent } from "react";
+import { isBefore } from "date-fns";
 import { BookOpen, CalendarDays, ChevronRight, GraduationCap, Plus, Users } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +18,9 @@ import {
 } from "@/lib/academics-api";
 import { switchAcademicSession } from "@/lib/academic-selection";
 import { toast } from "@/components/ui/toast";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
+import { parseDateOnly } from "@/lib/date-only";
+import { DateField } from "./date-field";
 
 function errorMessage(error: unknown) { return error instanceof Error ? error.message : "The request could not be completed"; }
 
@@ -24,10 +28,12 @@ function Choice({ label, value, onChange, options, placeholder }: {
   label: string; value: string; onChange: (value: string) => void;
   options: { id: string; name: string }[]; placeholder: string;
 }) {
+  const id = useId();
+  const items = [{ label: placeholder, value: null }, ...options.map((option) => ({ label: option.name, value: option.id }))];
   return <Field>
-    <FieldLabel>{label}</FieldLabel>
-    <Select value={value || null} onValueChange={(next) => onChange(next ?? "")}>
-      <SelectTrigger aria-label={label}><SelectValue placeholder={placeholder} /></SelectTrigger>
+    <FieldLabel htmlFor={id}>{label}</FieldLabel>
+    <Select items={items} value={value || null} onValueChange={(next) => onChange(next ?? "")}>
+      <SelectTrigger id={id} className="w-full"><SelectValue /></SelectTrigger>
       <SelectContent><SelectGroup>
         {options.map((option) => <SelectItem key={option.id} value={option.id}>{option.name}</SelectItem>)}
       </SelectGroup></SelectContent>
@@ -70,6 +76,9 @@ export function AcademicSetupClient() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [dateErrors, setDateErrors] = useState<{ start?: string; end?: string }>({});
 
   useEffect(() => { listAcademicSchools().then((items) => { setSchools(items); setSchoolId(items[0]?.id ?? ""); }).catch((cause) => { const detail = errorMessage(cause); setError(detail); toast.add({ type: "error", title: "Could not load schools", description: detail, priority: "high" }); }); }, []);
   const refresh = useCallback(async (id: string) => {
@@ -120,18 +129,28 @@ export function AcademicSetupClient() {
       </div></CardContent></Card>}
     {schoolId && <div className="grid gap-5 lg:grid-cols-2">
       <Card><CardHeader><CardTitle>New academic session</CardTitle><CardDescription>Set the calendar dates for a school year.</CardDescription></CardHeader>
-        <CardContent><form onSubmit={async (event) => { event.preventDefault(); const element = event.currentTarget; const form = new FormData(element); const saved = await mutate(() => addAcademicSession(schoolId, {
-          name: String(form.get("name")), code: String(form.get("code")), startDate: String(form.get("startDate")), endDate: String(form.get("endDate")),
-        }), "Academic session created"); if (saved) element.reset(); }}><FieldGroup>
+        <CardContent><form onSubmit={async (event) => { event.preventDefault(); const element = event.currentTarget; const form = new FormData(element);
+          const nextErrors = { start: startDate ? undefined : "Choose a start date.", end: endDate ? undefined : "Choose an end date." };
+          if (startDate && endDate && isBefore(parseDateOnly(endDate), parseDateOnly(startDate))) nextErrors.end = "End date must be on or after the start date.";
+          setDateErrors(nextErrors);
+          if (nextErrors.start || nextErrors.end) return;
+          const saved = await mutate(() => addAcademicSession(schoolId, {
+            name: String(form.get("name")), code: String(form.get("code")), startDate, endDate,
+          }), "Academic session created");
+          if (saved) { element.reset(); setStartDate(""); setEndDate(""); setDateErrors({}); }
+        }}><FieldGroup>
           <div className="grid gap-4 sm:grid-cols-2"><Field><FieldLabel htmlFor="session-name">Session name</FieldLabel><Input id="session-name" name="name" required placeholder="2026–27" /></Field><Field><FieldLabel htmlFor="session-code">Code</FieldLabel><Input id="session-code" name="code" required placeholder="2026" /></Field></div>
-          <div className="grid gap-4 sm:grid-cols-2"><Field><FieldLabel htmlFor="start-date">Start date</FieldLabel><Input id="start-date" name="startDate" type="date" required /></Field><Field><FieldLabel htmlFor="end-date">End date</FieldLabel><Input id="end-date" name="endDate" type="date" required /></Field></div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <DateField id="start-date" label="Start date" value={startDate} error={dateErrors.start} onChange={(next) => { setStartDate(next); setDateErrors({}); if (endDate && isBefore(parseDateOnly(endDate), parseDateOnly(next))) setEndDate(""); }} />
+            <DateField id="end-date" label="End date" value={endDate} error={dateErrors.end} earliestDate={startDate || undefined} onChange={(next) => { setEndDate(next); setDateErrors({}); }} />
+          </div>
           <Button type="submit" disabled={busy}><CalendarDays data-icon="inline-start" />Create session</Button>
         </FieldGroup></form></CardContent>
       </Card>
       <Card><CardHeader><CardTitle>Session status</CardTitle><CardDescription>Only one academic session is active per school.</CardDescription></CardHeader>
         <CardContent className="flex flex-col gap-4">
           {session ? <><div className="flex items-center justify-between rounded-lg border p-4"><div><strong className="text-base">{session.name}</strong><p className="text-muted-foreground">{session.startDate} to {session.endDate}</p></div><Badge variant={session.status === "active" ? "default" : "secondary"}>{session.status}</Badge></div>
-            {session.status === "draft" && <Button disabled={busy || !classes.length || !sections.length || !subjects.length} onClick={() => { if (window.confirm(`Activate ${session.name}? The current active session will be archived.`)) void mutate(() => activateAcademicSession(schoolId, session.id), "Academic session activated"); }}>Activate session</Button>}
+            {session.status === "draft" && <ConfirmationDialog triggerLabel="Activate session" title={`Activate ${session.name}?`} description="The current active session will be archived." confirmLabel="Activate session" disabled={busy || !classes.length || !sections.length || !subjects.length} onConfirm={() => { void mutate(() => activateAcademicSession(schoolId, session.id), "Academic session activated"); }} />}
             {session.status === "draft" && (!classes.length || !sections.length || !subjects.length) && <p className="text-sm text-muted-foreground">Add at least one class, section, and subject to activate.</p>}
           </> : <p className="text-sm text-muted-foreground">Create a session to begin academic setup.</p>}
         </CardContent>

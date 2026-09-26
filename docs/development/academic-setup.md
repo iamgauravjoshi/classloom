@@ -2,6 +2,10 @@
 
 Sign in to a school workspace with a role that grants `school.manage`, then open **Academic Setup** in the sidebar. Create a session with start and end dates, add classes, sections, and subjects, optionally assign an active school account to a section and subject, then activate the session. Activation requires at least one class, section, and subject; it archives the former active session. Archived sessions remain visible and cannot be changed. Only one session can be active per school.
 
+For frontend date parsing, formatting, and calendar calculations, use `date-fns` rather than hand-written date arithmetic. Preserve date-only values as dates instead of shifting them through the browser timezone, and use the school's configured timezone for date-time behavior.
+
+The new session form uses the shadcn Base UI calendar and popover for start and end dates. It requires both dates, prevents an end date before the start date, and sends date-only `YYYY-MM-DD` values to the API. Session activation uses an in-app confirmation dialog.
+
 The `GET /api/v1/academics/schools` endpoint lists schools for which the current membership has `school.read`. `GET /api/v1/academics/schools/:schoolId/setup` returns the session configuration. Mutating endpoints create sessions, classes, sections, subjects, assignments, and activate sessions under that school. They require `school.manage`, an authenticated server session, and the usual origin and `X-ClassLoom-Request: 1` CSRF checks. The tenant ID always comes from the active server session. `GET /api/v1/academics/schools/:schoolId/staff` lists active accounts with a role grant in the requested school, for assignment selection.
 
 Forms show validation or permission errors in place and through animated toasts; successful saves also show a toast. Changing the selected session clears dependent class, section, subject, and account selections so a form cannot silently write to the previously selected session.

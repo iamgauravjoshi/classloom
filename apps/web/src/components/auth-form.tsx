@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { authRequest, login, getSession } from "@/lib/auth-api";
 import { LogoutButton } from "@/components/logout-button";
 import { toast } from "@/components/ui/toast";
@@ -79,12 +80,14 @@ export function AuthForm({ mode, token = "", currentEmail }: { mode: Mode; token
     <p className="auth-description">{mode === "login" ? "Sign in with your school account to continue." : "Enter your details below to continue securely."}</p>
     {mode === "invite-existing" && currentEmail ? <div className="auth-description">Signed in as <strong>{currentEmail}</strong>. If this invitation was sent to another account, sign out to switch accounts. <LogoutButton returnTo={`/accept-invitation?token=${encodeURIComponent(token)}`} /></div> : null}
     <form onSubmit={submit} onInput={(event) => { const name = (event.target as HTMLInputElement).name; if (name) setFieldErrors((current) => { const next = { ...current }; delete next[name]; return next; }); }} className="auth-form">
-      {mode === "login" || mode === "forgot" ? <label>Email address<Input name="email" type="email" autoComplete="email" required maxLength={254} aria-invalid={Boolean(fieldErrors.email)} aria-describedby={fieldErrors.email ? "auth-email-error" : undefined} />{fieldErrors.email && <small id="auth-email-error" className="auth-error">{fieldErrors.email}</small>}</label> : null}
-      {mode === "invite" ? <label>Your name<Input name="displayName" autoComplete="name" maxLength={120} /></label> : null}
-      {mode === "login" || mode === "invite" || mode === "reset" ? <label>{mode === "login" ? "Password" : "Create password"}<Input name="password" type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} required maxLength={1024} aria-invalid={Boolean(fieldErrors.password)} aria-describedby={fieldErrors.password ? "auth-password-error" : undefined} />{mode !== "login"&&<small>Use 15–256 characters.</small>}{fieldErrors.password && <small id="auth-password-error" className="auth-error">{fieldErrors.password}</small>}</label> : null}
+      <FieldGroup className="gap-4">
+      {mode === "login" || mode === "forgot" ? <Field data-invalid={Boolean(fieldErrors.email) || undefined}><FieldLabel htmlFor="auth-email">Email address</FieldLabel><Input id="auth-email" name="email" type="email" autoComplete="email" required maxLength={254} aria-invalid={Boolean(fieldErrors.email)} aria-describedby={fieldErrors.email ? "auth-email-error" : undefined} />{fieldErrors.email && <FieldError id="auth-email-error">{fieldErrors.email}</FieldError>}</Field> : null}
+      {mode === "invite" ? <Field><FieldLabel htmlFor="auth-name">Your name</FieldLabel><Input id="auth-name" name="displayName" autoComplete="name" maxLength={120} /></Field> : null}
+      {mode === "login" || mode === "invite" || mode === "reset" ? <Field data-invalid={Boolean(fieldErrors.password) || undefined}><FieldLabel htmlFor="auth-password">{mode === "login" ? "Password" : "Create password"}</FieldLabel><Input id="auth-password" name="password" type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} required maxLength={1024} aria-invalid={Boolean(fieldErrors.password)} aria-describedby={fieldErrors.password ? "auth-password-error" : undefined} />{mode !== "login"&&<FieldDescription>Use 15–256 characters.</FieldDescription>}{fieldErrors.password && <FieldError id="auth-password-error">{fieldErrors.password}</FieldError>}</Field> : null}
       {error ? <p className="auth-error" role="alert">{error}</p> : null}
       {message ? <p className="auth-success" role="status">{message}</p> : null}
       <Button type="submit" disabled={busy} className="auth-submit">{busy ? "Please wait…" : mode === "login" ? "Sign in" : mode === "forgot" ? "Send reset link" : mode === "reset" ? "Update password" : "Accept invitation"}</Button>
+      </FieldGroup>
     </form>
     <div className="auth-links">{mode === "login" ? <Link href="/forgot-password">Forgot password?</Link> : mode === "invite" ? <Link href={`/login?returnTo=${encodeURIComponent(`/accept-invitation?token=${token}`)}`}>Already have an account? Sign in</Link> : <Link href="/login">Back to sign in</Link>}</div>
   </section></main>;
