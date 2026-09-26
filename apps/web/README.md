@@ -1,34 +1,24 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ClassLoom Web App
 
-## Getting Started
+The frontend is a Next.js App Router application in `src/app/`. Shared shadcn components are in `src/components/ui/`; API clients and helpers are in `src/lib/`. The project uses React, TypeScript, Tailwind CSS 4, shadcn/ui with Base UI primitives, and Lucide icons.
 
-First, run the development server:
+## Development
+
+From the repository root, follow the [local setup guide](../../README.md#local-development-setup), then run `pnpm dev`. The root script builds the shared database package, loads `.env`, and starts the web app and API. The web app is served at `http://localhost:3000`.
+
+Useful package commands:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm --filter @classloom/web test
+pnpm --filter @classloom/web lint
+pnpm --filter @classloom/web typecheck
+pnpm --filter @classloom/web build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Frontend Conventions
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Read [`AGENTS.md`](AGENTS.md) before changing frontend code. It contains the detailed requirements for Next.js 16, server/client boundaries, API proxy and session handling, Base UI components, accessibility, shadcn and React skills, date-fns, Faker.js, and the BMAD feature workflow. Use `.agents/skills/shadcn/SKILL.md` and the shadcn MCP; if MCP is unavailable, use the shadcn CLI. Preserve the Base UI base configured in `components.json`.
 
-## Learn More
+Protected pages must rely on server-resolved sessions, and the API remains authoritative for permissions and tenant access. Browser API mutations must preserve the existing same-origin proxy and CSRF header behavior. Do not expose `API_INTERNAL_URL` to client-side code.
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+See [authentication development](../../docs/development/authentication.md) and [academic setup](../../docs/development/academic-setup.md) for the implemented flows.

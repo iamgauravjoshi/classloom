@@ -1,6 +1,6 @@
 # ClassLoom
 
-ClassLoom is a production-grade, multi-tenant School Management System SaaS designed to help schools manage academic, administrative, operational, and financial workflows from a single platform.
+ClassLoom is being built as a production-grade, multi-tenant School Management System SaaS for academic, administrative, operational, and financial workflows.
 
 The system is being built with scalability, maintainability, security, tenant isolation, and long-term product evolution in mind.
 
@@ -22,7 +22,7 @@ The platform is designed for multiple stakeholders, including:
 - Transport staff
 - Other school employees
 
-Each school operates as an isolated tenant within the SaaS platform.
+Each tenant is isolated and can own multiple schools; each school can have multiple campuses.
 
 ClassLoom is being developed incrementally, with each major feature documented, designed, implemented, tested, and integrated into the broader architecture.
 
@@ -56,6 +56,8 @@ ClassLoom is designed around the following principles:
 - Next.js
 - React
 - TypeScript
+- Tailwind CSS
+- shadcn/ui with Base UI primitives
 - ESLint
 - Modern server/client rendering patterns
 
@@ -114,12 +116,14 @@ classloom/
 │   │
 │   └── api/
 │       ├── src/
-│       └── test/
+│       ├── test/                 # shared API end-to-end tests
+│       └── AGENTS.md
 │
 ├── packages/
 │   └── db/
 │       ├── src/
-│       └── migrations/
+│       ├── drizzle/              # generated SQL migrations and metadata
+│       └── AGENTS.md
 │
 ├── docs/
 │   ├── product/
@@ -146,6 +150,8 @@ apps/web/AGENTS.md
 
 Read this file before making changes to the web application.
 
+It is the source of frontend-specific working guidance, including shadcn and React skills, UI component consistency, date handling, and deterministic sample data. The web app README summarizes local commands and links to the implemented flows.
+
 ---
 
 ### `apps/api`
@@ -161,6 +167,8 @@ End-to-end tests are located in:
 ```text
 apps/api/test/
 ```
+
+Feature-specific API end-to-end tests may also live beside their module under `apps/api/src/`.
 
 ---
 
@@ -232,7 +240,9 @@ Contains developer-focused documentation including:
 
 The ClassLoom backend is implemented as a modular monolith.
 
-The application is deployed as a unified backend while maintaining strong logical boundaries between business domains.
+The API is designed to deploy as one backend while maintaining strong logical boundaries between business domains.
+
+The diagram below illustrates the intended module boundaries; it does not mean every listed school workflow is already implemented. Current scope is tracked in `docs/product/mvp-scope.md` and the phase plans under `docs/superpowers/plans/`.
 
 Conceptually:
 
@@ -277,33 +287,25 @@ Cross-module interactions should happen through explicit contracts such as:
 
 ClassLoom is a multi-tenant SaaS platform.
 
-Each school represents an isolated tenant.
+Each tenant is isolated and can contain one or more schools. Each school can contain multiple campuses.
 
 Example:
 
 ```text
 ClassLoom Platform
 │
-├── School A
-│   ├── Students
-│   ├── Teachers
-│   ├── Fees
-│   └── Attendance
+├── Tenant A
+│   ├── School A
+│   │   └── Campuses
+│   └── School B
+│       └── Campuses
 │
-├── School B
-│   ├── Students
-│   ├── Teachers
-│   ├── Fees
-│   └── Attendance
-│
-└── School C
-    ├── Students
-    ├── Teachers
-    ├── Fees
-    └── Attendance
+└── Tenant B
+    └── School C
+        └── Campuses
 ```
 
-A user belonging to one tenant must never be able to access another tenant's protected resources unless explicitly authorized through platform-level functionality.
+An account may have memberships in multiple tenants, but each request must use its authenticated active membership. It must not access another tenant's protected resources unless an explicit platform-level operation authorizes that access.
 
 Tenant isolation is considered a system invariant.
 
@@ -462,13 +464,17 @@ Update the local values if required.
 
 Never commit secrets or production credentials.
 
+`DATABASE_URL` is the restricted API runtime connection. `DATABASE_MIGRATION_URL` and `DATABASE_PROVISIONER_URL` are trusted server-side connections; never expose them to browser code.
+
 ---
 
-## 4. Start PostgreSQL
+## 4. Start PostgreSQL and local email
 
 ```bash
-docker compose up -d db
+docker compose up -d db mailpit
 ```
+
+PostgreSQL is available on host port `5433` (container port `5432`); Mailpit's SMTP and inbox ports are `1025` and `8025`.
 
 Verify the container is running:
 
@@ -502,7 +508,17 @@ pnpm db:check
 
 ---
 
-## 8. Start development servers
+## 8. Provision a starter tenant and school
+
+```bash
+pnpm db:provision-tenant -- --name "Demo School Group" --slug demo-school-group --school-name "Demo School" --school-code DEMO --timezone Asia/Kolkata --currency INR
+```
+
+Use a unique slug for each tenant. This trusted local command uses `DATABASE_PROVISIONER_URL`.
+
+---
+
+## 9. Start development servers
 
 ```bash
 pnpm dev
@@ -514,6 +530,10 @@ By default:
 Web Application: http://localhost:3000
 API:             http://localhost:4000
 ```
+
+The API health endpoint is `http://localhost:4000/api/v1/health`; OpenAPI documentation is at `http://localhost:4000/api/docs`.
+
+Mailpit captures development email at [http://localhost:8025](http://localhost:8025). To create a local administrator, invite an account with `pnpm --filter @classloom/api auth:invite -- <tenant-id> <email>`, accept the invitation, then grant the first tenant administrator with `pnpm --filter @classloom/api auth:bootstrap-admin -- <tenant-id> <email>`. See [authentication development](docs/development/authentication.md) for details.
 
 ---
 
@@ -557,6 +577,8 @@ pnpm typecheck
 pnpm test
 ```
 
+PostgreSQL integration tests need the local environment loaded. Run `pnpm exec dotenv -e .env -- pnpm test` to include them; plain `pnpm test` skips database integration tests when their required URLs are unavailable.
+
 ---
 
 ## Production build
@@ -594,6 +616,14 @@ Generated migrations must be reviewed before being committed.
 ```bash
 pnpm db:migrate
 ```
+
+## Provision a tenant and school
+
+```bash
+pnpm db:provision-tenant -- --name "Demo School Group" --slug demo-school-group --school-name "Demo School" --school-code DEMO --timezone Asia/Kolkata --currency INR
+```
+
+The command requires `DATABASE_PROVISIONER_URL` and creates both records atomically. See [local setup](docs/development/local-setup.md).
 
 ---
 
@@ -638,6 +668,8 @@ and are located under:
 apps/api/test/
 ```
 
+Feature-specific end-to-end tests may also live beside their module under `apps/api/src/`.
+
 ---
 
 ## Run all workspace tests
@@ -651,8 +683,10 @@ pnpm test
 ## API end-to-end tests
 
 ```bash
-pnpm --filter @classloom/api test:e2e
+pnpm exec dotenv -e .env -- pnpm --filter @classloom/api test:e2e
 ```
+
+The dotenv wrapper supplies the local PostgreSQL URLs required by the integration setup.
 
 ---
 
@@ -1154,7 +1188,7 @@ pnpm build
 For API-related changes:
 
 ```bash
-pnpm --filter @classloom/api test:e2e
+pnpm exec dotenv -e .env -- pnpm --filter @classloom/api test:e2e
 ```
 
 For database changes:

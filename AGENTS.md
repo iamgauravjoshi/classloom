@@ -1,31 +1,25 @@
 # Repository Guidelines
 
-## Project Structure & Module Organization
+## Project Structure
 
-This pnpm workspace contains `apps/web` (Next.js UI), `apps/api` (NestJS API), and `packages/db` (Drizzle schema, migrations, and database access). Application code lives under each package's `src/`; API end-to-end tests live in `apps/api/test/`. Keep unit tests beside the code they cover. Use `docs/product`, `docs/architecture`, `docs/decisions`, and `docs/development` for scope, design, decisions, and contributor notes. The API is a modular monolith: keep domain contracts explicit and do not treat another module's tables as its public interface.
+ClassLoom is a pnpm monorepo: `apps/web` is the Next.js frontend, `apps/api` is the NestJS REST API, and `packages/db` owns Drizzle schemas, PostgreSQL access, and SQL migrations in `packages/db/drizzle/`. Tests live beside source; API end-to-end tests also use `apps/api/test/`. Product scope and delivery phases are in `docs/product` and `docs/superpowers`; architecture and security boundaries are in `docs/architecture`; accepted decisions are in `docs/decisions`.
 
-## Build, Test, and Development Commands
+## Agent Workflow
 
-Use Node.js 24.15+ and pnpm 11.19. From the repository root:
+Before a change, read the closest `AGENTS.md`, inspect the relevant implementation and tests, and consult product or architecture docs when behavior, data ownership, security, or module contracts are involved. Follow established package patterns. Do not add unrequested product behavior, broad refactors, or speculative infrastructure. Keep documentation in sync with behavior and architecture changes. Record significant, hard-to-reverse design changes as an ADR.
 
-- `pnpm install` installs workspace dependencies.
-- Copy `.env.example` to `.env`, run `docker compose up -d db`, then `pnpm db:setup-runtime-role` and `pnpm db:migrate` to prepare local PostgreSQL.
-- `pnpm dev` starts the web app and API at ports 3000 and 4000.
-- `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `pnpm build` run checks across all workspace packages.
-- `pnpm db:generate` creates a migration after schema changes; `pnpm db:check` checks database connectivity.
+## Architecture and Security Invariants
 
-## Coding Style & Naming Conventions
+The API is a modular monolith. A domain owns its business rules and data access; modules interact through explicit application contracts, not another module's tables. The API enforces authorization; frontend visibility is only a user experience choice. Tenant context comes from the authenticated server-side membership, never an untrusted client tenant ID. Every tenant-owned database operation must use the established tenant context and forced row-level security. Do not expose migration or provisioner credentials to application clients.
 
-Follow `.editorconfig`: UTF-8, LF endings, two-space indentation, and a final newline. Use TypeScript and the conventions of the package you edit. The web app uses ESLint with Next.js rules; the API uses Oxlint and has a `format` script for Prettier. Name unit tests `*.spec.ts` and API end-to-end tests `*.e2e-spec.ts`. Keep schema changes in `packages/db` and commit generated Drizzle migrations with them. Read `apps/web/AGENTS.md` before changing Next.js code.
+## Database Changes
 
-## Testing Guidelines
+Edit schema in `packages/db/src/schema.ts`, generate migrations with `pnpm db:generate`, inspect generated SQL, and commit schema and migration together. Add a new migration for changes to an already-applied migration. Preserve tenant-scoped foreign keys, uniqueness, RLS policies, and runtime-role grants. Use `DATABASE_MIGRATION_URL` for migrations and `DATABASE_PROVISIONER_URL` only for trusted provisioning operations.
 
-Vitest runs unit tests across the workspace. Run API end-to-end tests with `pnpm --filter @classloom/api test:e2e` and API coverage with `pnpm --filter @classloom/api test:cov`. Add focused tests for domain rules, API behavior, and database adapters; use PostgreSQL for integration tests. The testing strategy requires tenant-isolation integration tests for every tenant-owned module when those modules are introduced. No numeric coverage threshold is specified.
+## Commands and Verification
 
-## Commit & Pull Request Guidelines
+Use Node.js 24.15+ and pnpm 11.19. Common root commands are `pnpm dev`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `pnpm build`. Local PostgreSQL uses port 5433: follow `README.md` and `docs/development/local-setup.md` to configure `.env`, start Docker services, set up the runtime role, migrate, and provision a tenant. Database-backed tests need environment variables loaded: `pnpm exec dotenv -e .env -- pnpm test`. API end-to-end tests use `pnpm --filter @classloom/api test:e2e`; load `.env` with dotenv when their PostgreSQL credentials are needed. Report checks as passing only when run.
 
-The recorded commits use concise, scoped subjects such as `docs: plan Phase 0 foundation`; follow that `type: imperative summary` pattern. In pull requests, explain the change and its scope, link the relevant issue or design document, list commands run, and include screenshots for visible UI changes. Update related documentation when behavior or architecture changes.
+## Style and Contributions
 
-## Security & Configuration
-
-Keep secrets in ignored `.env` files; use `.env.example` only for safe local defaults. Never commit production database credentials. Preserve tenant boundaries and authorization checks when adding school-owned data.
+Follow `.editorconfig` (UTF-8, LF, two spaces, final newline). Web linting uses ESLint; API linting uses Oxlint; Vitest runs tests. Use `*.spec.ts` for unit tests and `*.e2e-spec.ts` for API end-to-end tests. Commit subjects follow the observed `type: imperative summary` format (for example, `docs: update local setup`). PRs should summarize purpose and affected areas, link relevant issues or design docs, list verification run, and include screenshots for UI changes. Keep secrets out of version control; `.env.example` contains development placeholders only.
