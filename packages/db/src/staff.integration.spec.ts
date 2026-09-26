@@ -9,6 +9,7 @@ import { provisionTenant } from './provisioning.js';
 import { academicTeacherAssignments, securityEvents, staffProfiles } from './schema.js';
 import {
   addStaffAffiliation, createStaffProfile, isAssignableTeacher, linkStaffMembership,
+  listAssignableTeacherAccounts,
   listEligibleStaffAccounts, listSchoolStaff, readSchoolStaff, StaffError,
   unlinkStaffMembership, updateStaffAffiliation, updateStaffProfile, upsertTeacherProfile,
 } from './staff.js';
@@ -22,6 +23,7 @@ describe.skipIf(!enabled)('staff directory persistence', () => {
   const actorEmail = `staff-actor-${randomUUID()}@example.test`;
   const otherActorEmail = `staff-actor-${randomUUID()}@example.test`;
   const noGrantEmail = `staff-no-grant-${randomUUID()}@example.test`;
+  const concurrentEmail = `staff-race-${randomUUID()}@example.test`;
   const secondSchoolId = randomUUID();
   let admin: ReturnType<typeof postgres>;
   let runtime: ReturnType<typeof createDb>;
@@ -58,7 +60,7 @@ describe.skipIf(!enabled)('staff directory persistence', () => {
   });
 
   afterAll(async () => {
-    if (admin) { await admin`delete from tenants where slug in (${slug}, ${otherSlug})`; await admin`delete from accounts where normalized_email in (${actorEmail}, ${otherActorEmail}, ${noGrantEmail})`; await admin.end(); }
+    if (admin) { await admin`delete from tenants where slug in (${slug}, ${otherSlug})`; await admin`delete from accounts where normalized_email in (${actorEmail}, ${otherActorEmail}, ${noGrantEmail}, ${concurrentEmail})`; await admin.end(); }
     if (runtime) await runtime.close();
     if (provisioner) await provisioner.close();
   });
@@ -128,6 +130,14 @@ describe.skipIf(!enabled)('staff directory persistence', () => {
     await admin`update memberships set status = 'active' where id = ${actorMembershipId}`;
     const [grant] = await admin<{ id: string }[]>`delete from membership_role_assignments where tenant_id = ${tenantId} and membership_id = ${actorMembershipId} returning role_id as id`;
     expect(await withTenantContext(runtime.db, tenantId, (tx) => isAssignableTeacher(tx, scope, actorMembershipId))).toBe(false);
+    const campusId = randomUUID();
+    await admin`insert into campuses (id, tenant_id, school_id, name, code) values (${campusId}, ${tenantId}, ${schoolId}, 'Staff Test Campus', 'STC')`;
+    await admin`insert into membership_role_assignments (tenant_id, membership_id, role_id, scope_kind, school_id, campus_id) values (${tenantId}, ${actorMembershipId}, ${grant!.id}, 'campus', ${schoolId}, ${campusId})`;
+    expect(await withTenantContext(runtime.db, tenantId, (tx) => isAssignableTeacher(tx, scope, actorMembershipId))).toBe(false);
+    expect((await withTenantContext(runtime.db, tenantId, (tx) => listAssignableTeacherAccounts(tx, scope))).map((item) => item.id)).not.toContain(actorMembershipId);
+    await admin`insert into membership_role_assignments (tenant_id, membership_id, role_id, scope_kind, school_id, campus_id) values (${tenantId}, ${noGrantMembershipId}, ${grant!.id}, 'campus', ${schoolId}, ${campusId})`;
+    expect((await withTenantContext(runtime.db, tenantId, (tx) => listEligibleStaffAccounts(tx, scope))).map((item) => item.id)).not.toContain(noGrantMembershipId);
+    await admin`delete from membership_role_assignments where tenant_id = ${tenantId} and membership_id = ${actorMembershipId} and scope_kind = 'campus'`;
     await admin`insert into membership_role_assignments (tenant_id, membership_id, role_id, scope_kind) values (${tenantId}, ${actorMembershipId}, ${grant!.id}, 'tenant')`;
     expect(await withTenantContext(runtime.db, tenantId, (tx) => isAssignableTeacher(tx, scope, actorMembershipId))).toBe(true);
     await withTenantContext(runtime.db, tenantId, (tx) => addStaffAffiliation(tx, scope, secondSchoolId, person.id, { designation: 'Visiting Teacher', kind: 'teacher' }, { actorAccountId }));
@@ -163,7 +173,8 @@ describe.skipIf(!enabled)('staff directory persistence', () => {
       affiliation: { designation: 'Teacher', kind: 'staff' },
     }, { actorAccountId }));
     await expect(withTenantContext(runtime.db, tenantId, (tx) => addStaffAffiliation(tx, scope, schoolId, one.id, { designation: 'Teacher', kind: 'staff' }, { actorAccountId }))).rejects.toMatchObject({ code: 'CONFLICT' });
-    await expect(withTenantContext(runtime.db, tenantId, (tx) => updateStaffAffiliation(tx, scope, one.id, { kind: 'teacher' }, { actorAccountId }))).rejects.toMatchObject({ code: 'INVALID' });
+    await expect(withTenantContext(runtime.db, tenantId, (tx) => updateStaffAffiliation(tx, scope, one.id, { kind: 'teacher' }, { actorAccountId }))).resolves.toMatchObject({ kind: 'teacher' });
+    expect((await withTenantContext(runtime.db, tenantId, (tx) => readSchoolStaff(tx, scope, one.id))).qualification).toBeNull();
     await withTenantContext(runtime.db, tenantId, (tx) => updateStaffAffiliation(tx, scope, one.id, { status: 'inactive' }, { actorAccountId }));
     await admin`update accounts set status = 'disabled' where normalized_email = ${noGrantEmail}`;
     await expect(withTenantContext(runtime.db, tenantId, (tx) => linkStaffMembership(tx, scope, one.id, noGrantMembershipId, { actorAccountId }))).rejects.toMatchObject({ code: 'INVALID' });
@@ -176,5 +187,42 @@ describe.skipIf(!enabled)('staff directory persistence', () => {
     }, { actorAccountId }));
     await expect(withTenantContext(runtime.db, tenantId, (tx) => linkStaffMembership(tx, scope, two.id, actorMembershipId, { actorAccountId }))).rejects.toMatchObject({ code: 'CONFLICT' });
     await expect(withTenantContext(runtime.db, tenantId, (tx) => readSchoolStaff(tx, scope, randomUUID()))).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
+  it('serializes an assignment against unlinking its staff account', async () => {
+    const scope = { tenantId, schoolId };
+    const account = await createAccountWithMembership(runtime.db, { email: concurrentEmail, passwordHash: 'fixture-hash', tenantId });
+    const [role] = await admin<{ id: string }[]>`select id from authorization_roles where tenant_id = ${tenantId} and system_key = 'tenant_admin'`;
+    await admin`insert into membership_role_assignments (tenant_id, membership_id, role_id, scope_kind) values (${tenantId}, ${account.membershipId}, ${role!.id}, 'tenant')`;
+    const person = await withTenantContext(runtime.db, tenantId, (tx) => createStaffProfile(tx, scope, {
+      profile: { staffCode: 'RACE-1', givenName: 'Race', familyName: 'Teacher' },
+      affiliation: { designation: 'Teacher', kind: 'teacher' },
+    }, { actorAccountId }));
+    await withTenantContext(runtime.db, tenantId, (tx) => linkStaffMembership(tx, scope, person.id, account.membershipId, { actorAccountId }));
+    const session = await withTenantContext(runtime.db, tenantId, (tx) => createAcademicSession(tx, scope, { name: 'Race session', code: 'RACE2026', startDate: '2026-04-01', endDate: '2027-03-31' }));
+    const klass = await withTenantContext(runtime.db, tenantId, (tx) => createAcademicClass(tx, scope, session.id, { name: 'Race grade', code: 'RACEG' }));
+    const section = await withTenantContext(runtime.db, tenantId, (tx) => createAcademicSection(tx, scope, klass.id, { name: 'Race section', code: 'RACES' }));
+    const subject = await withTenantContext(runtime.db, tenantId, (tx) => createAcademicSubject(tx, scope, session.id, { name: 'Race subject', code: 'RACESUB' }));
+    let entered!: () => void;
+    let release!: () => void;
+    const atEligibility = new Promise<void>((resolve) => { entered = resolve; });
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const assignment = withTenantContext(runtime.db, tenantId, async (tx) => {
+      await createAcademicAssignment(tx, scope, section.id, { subjectId: subject.id, membershipId: account.membershipId });
+      expect(await isAssignableTeacher(tx, scope, account.membershipId)).toBe(true);
+      entered();
+      await gate;
+    });
+    await atEligibility;
+    const unlink = withTenantContext(runtime.db, tenantId, (tx) => unlinkStaffMembership(tx, scope, person.id, { actorAccountId }));
+    const early = await Promise.race([
+      unlink.then(() => 'completed', () => 'rejected'),
+      new Promise<string>((resolve) => setTimeout(() => resolve('pending'), 150)),
+    ]);
+    release();
+    await assignment;
+    const outcome = await unlink.then(() => 'completed', (error: unknown) => error instanceof StaffError ? error.code : 'other-error');
+    expect(early).toBe('pending');
+    expect(outcome).toBe('CONFLICT');
   });
 });

@@ -221,6 +221,13 @@ async function hasTeacherRecord(tx: TenantTransaction, tenantId: string, staffId
   return Boolean(record);
 }
 
+async function lockStaffProfile(tx: TenantTransaction, tenantId: string, staffId: string) {
+  const [record] = await tx.select({ id: staffProfiles.id }).from(staffProfiles)
+    .where(and(eq(staffProfiles.tenantId, tenantId), eq(staffProfiles.id, staffId)))
+    .for('update').limit(1);
+  if (!record) throw new StaffError('NOT_FOUND', 'Staff member was not found');
+}
+
 async function activeMemberAtSchool(tx: TenantTransaction, scope: StaffScope, membershipId: string): Promise<boolean> {
   const [member] = await tx.select({ id: memberships.id }).from(memberships)
     .innerJoin(accounts, eq(accounts.id, memberships.accountId))
@@ -231,7 +238,7 @@ async function activeMemberAtSchool(tx: TenantTransaction, scope: StaffScope, me
     .where(and(
       eq(memberships.tenantId, scope.tenantId), eq(memberships.id, membershipId),
       eq(memberships.status, 'active'), eq(accounts.status, 'active'),
-      or(eq(membershipRoleAssignments.scopeKind, 'tenant'), eq(membershipRoleAssignments.schoolId, scope.schoolId)),
+      or(eq(membershipRoleAssignments.scopeKind, 'tenant'), and(eq(membershipRoleAssignments.scopeKind, 'school'), eq(membershipRoleAssignments.schoolId, scope.schoolId))),
     )).limit(1);
   return Boolean(member);
 }
@@ -268,6 +275,7 @@ export async function updateStaffProfile(tx: TenantTransaction, scope: StaffScop
 }
 
 export async function updateStaffAffiliation(tx: TenantTransaction, scope: StaffScope, staffId: string, changes: Partial<StaffAffiliationInput>, audit: StaffAudit) {
+  await lockStaffProfile(tx, scope.tenantId, staffId);
   const current = await readSchoolStaff(tx, scope, staffId);
   const values = normalizedAffiliation({
     designation: changes.designation ?? current.designation,
@@ -276,7 +284,7 @@ export async function updateStaffAffiliation(tx: TenantTransaction, scope: Staff
     startDate: changes.startDate === undefined ? current.startDate : changes.startDate,
   });
   if (values.kind === 'teacher' && !await hasTeacherRecord(tx, scope.tenantId, staffId)) {
-    throw new StaffError('INVALID', 'Create teacher details before marking this affiliation as a teacher');
+    await tx.insert(teacherProfiles).values({ tenantId: scope.tenantId, staffId });
   }
   if (values.status === 'active' && current.membershipId) await requireMemberAtSchool(tx, scope, current.membershipId);
   await tx.update(staffSchoolAffiliations).set({ ...values, updatedAt: new Date() }).where(and(
@@ -287,6 +295,7 @@ export async function updateStaffAffiliation(tx: TenantTransaction, scope: Staff
 }
 
 export async function addStaffAffiliation(tx: TenantTransaction, source: StaffScope, targetSchoolId: string, staffId: string, input: StaffAffiliationInput, audit: StaffAudit) {
+  await lockStaffProfile(tx, source.tenantId, staffId);
   const current = await readSchoolStaff(tx, source, staffId);
   const values = normalizedAffiliation(input);
   const [targetSchool] = await tx.select({ id: schools.id }).from(schools).where(and(
@@ -294,7 +303,7 @@ export async function addStaffAffiliation(tx: TenantTransaction, source: StaffSc
   )).limit(1);
   if (!targetSchool) throw new StaffError('NOT_FOUND', 'Destination school was not found');
   if (values.kind === 'teacher' && !await hasTeacherRecord(tx, source.tenantId, staffId)) {
-    throw new StaffError('INVALID', 'Create teacher details before adding a teacher affiliation');
+    await tx.insert(teacherProfiles).values({ tenantId: source.tenantId, staffId });
   }
   if (values.status === 'active' && current.membershipId) await requireMemberAtSchool(tx, { ...source, schoolId: targetSchoolId }, current.membershipId);
   try {
@@ -323,6 +332,7 @@ export async function upsertTeacherProfile(tx: TenantTransaction, scope: StaffSc
 }
 
 export async function linkStaffMembership(tx: TenantTransaction, scope: StaffScope, staffId: string, membershipId: string, audit: StaffAudit) {
+  await lockStaffProfile(tx, scope.tenantId, staffId);
   const current = await readSchoolStaff(tx, scope, staffId);
   if (current.membershipId === membershipId) return current;
   if (current.membershipId) {
@@ -349,6 +359,7 @@ export async function linkStaffMembership(tx: TenantTransaction, scope: StaffSco
 }
 
 export async function unlinkStaffMembership(tx: TenantTransaction, scope: StaffScope, staffId: string, audit: StaffAudit) {
+  await lockStaffProfile(tx, scope.tenantId, staffId);
   const current = await readSchoolStaff(tx, scope, staffId);
   if (!current.membershipId) return current;
   const [assignment] = await tx.select({ id: academicTeacherAssignments.id }).from(academicTeacherAssignments).where(and(
@@ -372,12 +383,16 @@ export async function listEligibleStaffAccounts(tx: TenantTransaction, scope: St
     .leftJoin(staffProfiles, and(eq(staffProfiles.tenantId, memberships.tenantId), eq(staffProfiles.membershipId, memberships.id)))
     .where(and(
       eq(memberships.tenantId, scope.tenantId), eq(memberships.status, 'active'), eq(accounts.status, 'active'),
-      or(eq(membershipRoleAssignments.scopeKind, 'tenant'), eq(membershipRoleAssignments.schoolId, scope.schoolId)),
+      or(eq(membershipRoleAssignments.scopeKind, 'tenant'), and(eq(membershipRoleAssignments.scopeKind, 'school'), eq(membershipRoleAssignments.schoolId, scope.schoolId))),
       sql`${staffProfiles.id} is null`,
     )).orderBy(accounts.normalizedEmail);
 }
 
 export async function isAssignableTeacher(tx: TenantTransaction, scope: StaffScope, membershipId: string): Promise<boolean> {
+  const [linked] = await tx.select({ id: staffProfiles.id }).from(staffProfiles)
+    .where(and(eq(staffProfiles.tenantId, scope.tenantId), eq(staffProfiles.membershipId, membershipId)))
+    .for('update').limit(1);
+  if (!linked) return false;
   const [record] = await tx.select({ staffId: staffProfiles.id }).from(staffProfiles)
     .innerJoin(staffSchoolAffiliations, and(
       eq(staffSchoolAffiliations.tenantId, staffProfiles.tenantId), eq(staffSchoolAffiliations.staffId, staffProfiles.id),
@@ -409,6 +424,6 @@ export async function listAssignableTeacherAccounts(tx: TenantTransaction, scope
       eq(staffProfiles.tenantId, scope.tenantId), eq(staffSchoolAffiliations.schoolId, scope.schoolId),
       eq(staffSchoolAffiliations.status, 'active'), eq(staffSchoolAffiliations.kind, 'teacher'),
       eq(memberships.status, 'active'), eq(accounts.status, 'active'),
-      or(eq(membershipRoleAssignments.scopeKind, 'tenant'), eq(membershipRoleAssignments.schoolId, scope.schoolId)),
+      or(eq(membershipRoleAssignments.scopeKind, 'tenant'), and(eq(membershipRoleAssignments.scopeKind, 'school'), eq(membershipRoleAssignments.schoolId, scope.schoolId))),
     )).orderBy(accounts.normalizedEmail);
 }

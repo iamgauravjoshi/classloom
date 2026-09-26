@@ -19,28 +19,30 @@ import {
   type StaffPage, type StaffRecord, type StaffSchool,
 } from "@/lib/staff-api";
 import { StaffForm } from "./staff-form";
+import { DateField } from "../academic-setup/date-field";
 
 const message = (error: unknown) => error instanceof Error ? error.message : "The request could not be completed";
 
-function Choice({ id, label, value, options, onChange, placeholder }: {
+function Choice({ id, label, value, options, onChange, placeholder, clearable = false }: {
   id: string; label: string; value: string; options: { id: string; name: string }[];
-  onChange: (value: string) => void; placeholder: string;
+  onChange: (value: string) => void; placeholder: string; clearable?: boolean;
 }) {
   return <Field><FieldLabel htmlFor={id}>{label}</FieldLabel>
-    <Select items={[{ label: placeholder, value: null }, ...options.map((item) => ({ label: item.name, value: item.id }))]} value={value || null} onValueChange={(next) => onChange(next ?? "")}>
+    <Select items={[{ label: placeholder, value: null }, ...(clearable ? [{ label: placeholder, value: "__all__" }] : []), ...options.map((item) => ({ label: item.name, value: item.id }))]} value={value || null} onValueChange={(next) => onChange(next === "__all__" ? "" : next ?? "")}>
       <SelectTrigger id={id} className="w-full"><SelectValue /></SelectTrigger>
-      <SelectContent><SelectGroup>{options.map((item) => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}</SelectGroup></SelectContent>
+      <SelectContent><SelectGroup>{clearable && <SelectItem value="__all__">{placeholder}</SelectItem>}{options.map((item) => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}</SelectGroup></SelectContent>
     </Select>
   </Field>;
 }
 
-function StaffDetails({ staff, schoolId, schools, onChanged }: { staff: StaffRecord; schoolId: string; schools: StaffSchool[]; onChanged: () => void }) {
+function StaffDetails({ staff, schoolId, schools, onChanged }: { staff: StaffRecord; schoolId: string; schools: StaffSchool[]; onChanged: (fresh: StaffRecord) => void }) {
   const [busy, setBusy] = useState(false);
   const [eligible, setEligible] = useState<EligibleAccount[]>([]);
   const [membershipId, setMembershipId] = useState("");
   const [targetSchoolId, setTargetSchoolId] = useState("");
   const [targetKind, setTargetKind] = useState<"staff" | "teacher">("staff");
   const [targetDesignation, setTargetDesignation] = useState(staff.designation);
+  const [startDate, setStartDate] = useState(staff.startDate ?? "");
   const [error, setError] = useState("");
   const accountChoiceId = useId();
   const schoolChoiceId = useId();
@@ -55,7 +57,7 @@ function StaffDetails({ staff, schoolId, schools, onChanged }: { staff: StaffRec
 
   async function mutate(action: () => Promise<unknown>, success: string) {
     setBusy(true); setError("");
-    try { await action(); toast.add({ type: "success", title: "Saved", description: success }); onChanged(); }
+    try { await action(); const fresh = await getStaff(schoolId, staff.id); toast.add({ type: "success", title: "Saved", description: success }); onChanged(fresh); }
     catch (cause) { const detail = message(cause); setError(detail); toast.add({ type: "error", title: "Could not save staff details", description: detail, priority: "high" }); }
     finally { setBusy(false); }
   }
@@ -68,9 +70,11 @@ function StaffDetails({ staff, schoolId, schools, onChanged }: { staff: StaffRec
       {error && <Alert variant="destructive"><AlertTitle>Could not complete the request</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
       <div className="flex flex-wrap gap-2"><Badge variant={staff.status === "active" ? "default" : "secondary"}>{staff.status}</Badge><Badge variant="secondary">{staff.kind}</Badge><Badge variant="outline">{staff.membershipId ? "Linked account" : "No login account"}</Badge></div>
       <div className="grid gap-2 text-sm sm:grid-cols-2"><p><strong>Work email:</strong> {staff.workEmail || "—"}</p><p><strong>Phone:</strong> {staff.phone || "—"}</p><p><strong>Start date:</strong> {staff.startDate || "—"}</p><p><strong>Qualification:</strong> {staff.qualification || "—"}</p><p><strong>Specialization:</strong> {staff.specialization || "—"}</p></div>
-      {staff.canManageAffiliation && <form onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const data = new FormData(event.currentTarget); void mutate(() => updateStaff(schoolId, staff.id, { affiliation: { designation: formValue(data, "designation"), status: formValue(data, "status") as "active" | "inactive" } }), "School assignment updated"); }}>
+      {staff.canManageAffiliation && <form onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const data = new FormData(event.currentTarget); void mutate(() => updateStaff(schoolId, staff.id, { affiliation: { designation: formValue(data, "designation"), status: formValue(data, "status") as "active" | "inactive", kind: formValue(data, "kind") as "staff" | "teacher", startDate: startDate || null } }), "School assignment updated"); }}>
         <FieldGroup><h3 className="font-semibold">School assignment</h3><Field><FieldLabel htmlFor="staff-edit-designation">Designation</FieldLabel><Input id="staff-edit-designation" name="designation" defaultValue={staff.designation} required maxLength={120} /></Field>
+          <Field><FieldLabel htmlFor="staff-edit-kind">Role at this school</FieldLabel><Select name="kind" defaultValue={staff.kind} items={[{ label: "Staff", value: "staff" }, { label: "Teacher", value: "teacher" }]}><SelectTrigger id="staff-edit-kind" className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectGroup><SelectItem value="staff">Staff</SelectItem><SelectItem value="teacher">Teacher</SelectItem></SelectGroup></SelectContent></Select></Field>
           <Field><FieldLabel htmlFor="staff-edit-status">Status</FieldLabel><Select name="status" defaultValue={staff.status} items={[{ label: "Active", value: "active" }, { label: "Inactive", value: "inactive" }]}><SelectTrigger id="staff-edit-status" className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectGroup><SelectItem value="active">Active</SelectItem><SelectItem value="inactive">Inactive</SelectItem></SelectGroup></SelectContent></Select></Field>
+          <DateField id="staff-edit-start-date" label="Start date (optional)" value={startDate} onChange={setStartDate} required={false} />
           <Button type="submit" variant="outline" disabled={busy}>Save school assignment</Button></FieldGroup></form>}
       {staff.canEditShared && <div className="grid gap-6 lg:grid-cols-2">
         <form onSubmit={(event) => { event.preventDefault(); const data = new FormData(event.currentTarget); void mutate(() => updateStaff(schoolId, staff.id, { profile: { givenName: formValue(data, "givenName"), familyName: formValue(data, "familyName"), preferredName: formValue(data, "preferredName") || null, workEmail: formValue(data, "workEmail") || null, phone: formValue(data, "phone") || null } }), "Shared profile updated"); }}><FieldGroup>
@@ -89,7 +93,7 @@ function StaffDetails({ staff, schoolId, schools, onChanged }: { staff: StaffRec
           </FieldGroup>
         </div>
       </div>}
-      {staff.canManageAffiliation && schools.some((school) => school.id !== schoolId && school.canManageStaff) && <FieldGroup><h3 className="font-semibold">Add another school</h3>
+      {schools.some((school) => school.id !== schoolId && school.canManageStaff) && <FieldGroup><h3 className="font-semibold">Add another school</h3>
         <Choice id={schoolChoiceId} label="School" value={targetSchoolId} onChange={setTargetSchoolId} options={schools.filter((school) => school.id !== schoolId && school.canManageStaff).map((school) => ({ id: school.id, name: school.name }))} placeholder="Select school" />
         <Field><FieldLabel htmlFor={kindChoiceId}>Role at school</FieldLabel><Select items={[{ label: "Staff", value: "staff" }, { label: "Teacher", value: "teacher" }]} value={targetKind} onValueChange={(next) => setTargetKind(next as "staff" | "teacher")}><SelectTrigger id={kindChoiceId} className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectGroup><SelectItem value="staff">Staff</SelectItem><SelectItem value="teacher">Teacher</SelectItem></SelectGroup></SelectContent></Select></Field>
         <Field><FieldLabel htmlFor="staff-new-designation">Designation at new school</FieldLabel><Input id="staff-new-designation" value={targetDesignation} onChange={(event) => setTargetDesignation(event.target.value)} maxLength={120} /></Field>
@@ -109,6 +113,7 @@ export function StaffClient() {
   const [status, setStatus] = useState("");
   const [cursor, setCursor] = useState("");
   const [page, setPage] = useState<StaffPage | null>(null);
+  const [pageKey, setPageKey] = useState("");
   const [selectedId, setSelectedId] = useState("");
   const [selected, setSelected] = useState<StaffRecord | null>(null);
   const [version, setVersion] = useState(0);
@@ -119,26 +124,28 @@ export function StaffClient() {
   const schoolChoiceId = useId();
   const kindChoiceId = useId();
   const statusChoiceId = useId();
+  const queryKey = `${schoolId}|${deferredQuery}|${kind}|${status}|${cursor}|${version}`;
+  const directoryLoading = Boolean(schoolId && pageKey !== queryKey);
 
   useEffect(() => { listStaffSchools().then((items) => { setSchools(items); setSchoolId(items[0]?.id ?? ""); setLoading(false); }).catch((cause) => { setError(message(cause)); setLoading(false); }); }, []);
   useEffect(() => {
     if (!schoolId) return;
     let cancelled = false;
     listStaff(schoolId, { q: deferredQuery || undefined, kind: kind as "teacher" | "staff" || undefined, status: status as "active" | "inactive" || undefined, cursor: cursor || undefined })
-      .then((result) => { if (!cancelled) { setPage(result); setError(""); } })
-      .catch((cause) => { if (!cancelled) setError(message(cause)); });
+      .then((result) => { if (!cancelled) { setPage(result); setPageKey(queryKey); setError(""); } })
+      .catch((cause) => { if (!cancelled) { setPage(null); setPageKey(queryKey); setError(message(cause)); } });
     return () => { cancelled = true; };
-  }, [schoolId, deferredQuery, kind, status, cursor, version]);
+  }, [schoolId, deferredQuery, kind, status, cursor, version, queryKey]);
   useEffect(() => {
     if (!schoolId || !selectedId) return;
     let cancelled = false;
     getStaff(schoolId, selectedId).then((record) => { if (!cancelled) setSelected(record); }).catch((cause) => { if (!cancelled) setError(message(cause)); });
     return () => { cancelled = true; };
   }, [schoolId, selectedId, version]);
-  const changed = () => setVersion((current) => current + 1);
+  const changed = (fresh: StaffRecord) => { setSelected(fresh); setVersion((current) => current + 1); };
   async function save(input: StaffCreate) {
     setBusy(true); setError("");
-    try { const created = await createStaff(schoolId, input); setCreateOpen(false); setSelectedId(created.id); changed(); toast.add({ type: "success", title: "Staff profile created", description: `${created.givenName} ${created.familyName} is in the directory.` }); return true; }
+    try { const created = await createStaff(schoolId, input); setCreateOpen(false); setSelectedId(created.id); setVersion((current) => current + 1); toast.add({ type: "success", title: "Staff profile created", description: `${created.givenName} ${created.familyName} is in the directory.` }); return true; }
     catch (cause) { const detail = message(cause); setError(detail); toast.add({ type: "error", title: "Could not create staff profile", description: detail, priority: "high" }); throw cause; }
     finally { setBusy(false); }
   }
@@ -151,12 +158,12 @@ export function StaffClient() {
       <Card><CardHeader><CardTitle>Directory</CardTitle><CardDescription>Find people by name or staff code. Profiles can be affiliated with more than one school.</CardDescription></CardHeader><CardContent className="flex flex-col gap-4">
         <div className="grid gap-4 md:grid-cols-4"><Choice id={schoolChoiceId} label="School" value={schoolId} onChange={(value) => { setSchoolId(value); setSelectedId(""); setSelected(null); setPage(null); setCursor(""); }} options={schools.map((school) => ({ id: school.id, name: school.name }))} placeholder="Select school" />
           <Field><FieldLabel htmlFor="staff-search">Search</FieldLabel><div className="relative"><Search aria-hidden="true" className="absolute top-2 left-2 size-4 text-muted-foreground" /><Input id="staff-search" className="pl-8" value={query} onChange={(event) => { setQuery(event.target.value); setCursor(""); }} placeholder="Name or code" /></div></Field>
-          <Choice id={kindChoiceId} label="Role" value={kind} onChange={(value) => { setKind(value); setCursor(""); }} options={[{ id: "staff", name: "Staff" }, { id: "teacher", name: "Teacher" }]} placeholder="All roles" />
-          <Choice id={statusChoiceId} label="Status" value={status} onChange={(value) => { setStatus(value); setCursor(""); }} options={[{ id: "active", name: "Active" }, { id: "inactive", name: "Inactive" }]} placeholder="All statuses" /></div>
-        {page?.items.length ? <Table><TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Staff code</TableHead><TableHead>Designation</TableHead><TableHead>Role</TableHead><TableHead>Status</TableHead><TableHead><span className="sr-only">View profile</span></TableHead></TableRow></TableHeader><TableBody>
+          <Choice id={kindChoiceId} label="Role" value={kind} onChange={(value) => { setKind(value); setCursor(""); }} options={[{ id: "staff", name: "Staff" }, { id: "teacher", name: "Teacher" }]} placeholder="All roles" clearable />
+          <Choice id={statusChoiceId} label="Status" value={status} onChange={(value) => { setStatus(value); setCursor(""); }} options={[{ id: "active", name: "Active" }, { id: "inactive", name: "Inactive" }]} placeholder="All statuses" clearable /></div>
+        {directoryLoading ? <Skeleton className="h-48 w-full" /> : page?.items.length ? <Table><TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Staff code</TableHead><TableHead>Designation</TableHead><TableHead>Role</TableHead><TableHead>Status</TableHead><TableHead><span className="sr-only">View profile</span></TableHead></TableRow></TableHeader><TableBody>
           {page.items.map((item) => <TableRow key={item.id}><TableCell className="font-medium">{item.preferredName || item.givenName} {item.familyName}</TableCell><TableCell>{item.staffCode}</TableCell><TableCell>{item.designation}</TableCell><TableCell><Badge variant="secondary">{item.kind}</Badge></TableCell><TableCell><Badge variant={item.status === "active" ? "default" : "secondary"}>{item.status}</Badge></TableCell><TableCell><Button variant="outline" size="sm" onClick={() => setSelectedId(item.id)}>View</Button></TableCell></TableRow>)}
-        </TableBody></Table> : <Alert><AlertTitle>No staff found</AlertTitle><AlertDescription>Try another search or filter, or add the first staff profile for this school.</AlertDescription></Alert>}
-        <div className="flex justify-end gap-2">{cursor && <Button variant="outline" onClick={() => setCursor("")}>First page</Button>}{page?.nextCursor && <Button variant="outline" onClick={() => setCursor(page.nextCursor!)}>Next page</Button>}</div>
+        </TableBody></Table> : !error ? <Alert><AlertTitle>No staff found</AlertTitle><AlertDescription>Try another search or filter, or add the first staff profile for this school.</AlertDescription></Alert> : null}
+        {!directoryLoading && <div className="flex justify-end gap-2">{cursor && <Button variant="outline" onClick={() => setCursor("")}>First page</Button>}{page?.nextCursor && <Button variant="outline" onClick={() => setCursor(page.nextCursor!)}>Next page</Button>}</div>}
       </CardContent></Card>
       {selected && selected.id === selectedId && <StaffDetails key={`${schoolId}-${selectedId}-${version}`} staff={selected} schoolId={schoolId} schools={schools} onChanged={changed} />}
     </>}
