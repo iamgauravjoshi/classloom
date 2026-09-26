@@ -323,6 +323,59 @@ const tenantPolicy = (table: { tenantId: import('drizzle-orm/pg-core').PgColumn 
   withCheck: sql`${table.tenantId} = nullif(current_setting('app.tenant_id', true), '')::uuid`,
 });
 
+export const staffProfiles = pgTable('staff_profiles', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  staffCode: text('staff_code').notNull(),
+  givenName: text('given_name').notNull(),
+  familyName: text('family_name').notNull(),
+  preferredName: text('preferred_name'),
+  workEmail: text('work_email'),
+  phone: text('phone'),
+  membershipId: uuid('membership_id'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.tenantId, table.membershipId], foreignColumns: [memberships.tenantId, memberships.id], name: 'staff_profiles_tenant_membership_fk' }).onDelete('restrict'),
+  uniqueIndex('staff_profiles_tenant_id_id_unique').on(table.tenantId, table.id),
+  uniqueIndex('staff_profiles_tenant_code_unique').on(table.tenantId, sql`upper(trim(${table.staffCode}))`),
+  uniqueIndex('staff_profiles_tenant_membership_unique').on(table.tenantId, table.membershipId).where(sql`${table.membershipId} is not null`),
+  tenantPolicy(table),
+]).enableRLS();
+
+export const staffSchoolAffiliations = pgTable('staff_school_affiliations', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  staffId: uuid('staff_id').notNull(),
+  schoolId: uuid('school_id').notNull(),
+  designation: text('designation').notNull(),
+  startDate: date('start_date'),
+  kind: text('kind').notNull().default('staff'),
+  status: text('status').notNull().default('active'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.tenantId, table.staffId], foreignColumns: [staffProfiles.tenantId, staffProfiles.id], name: 'staff_affiliations_tenant_staff_fk' }).onDelete('cascade'),
+  foreignKey({ columns: [table.tenantId, table.schoolId], foreignColumns: [schools.tenantId, schools.id], name: 'staff_affiliations_tenant_school_fk' }).onDelete('cascade'),
+  uniqueIndex('staff_affiliations_tenant_staff_school_unique').on(table.tenantId, table.staffId, table.schoolId),
+  index('staff_affiliations_school_status_idx').on(table.tenantId, table.schoolId, table.status),
+  check('staff_affiliations_kind_check', sql`${table.kind} in ('staff', 'teacher')`),
+  check('staff_affiliations_status_check', sql`${table.status} in ('active', 'inactive')`),
+  tenantPolicy(table),
+]).enableRLS();
+
+export const teacherProfiles = pgTable('teacher_profiles', {
+  staffId: uuid('staff_id').primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  qualification: text('qualification'),
+  specialization: text('specialization'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.tenantId, table.staffId], foreignColumns: [staffProfiles.tenantId, staffProfiles.id], name: 'teacher_profiles_tenant_staff_fk' }).onDelete('cascade'),
+  tenantPolicy(table),
+]).enableRLS();
+
 export const academicSessions = pgTable('academic_sessions', {
   id: uuid('id').defaultRandom().primaryKey(),
   tenantId: uuid('tenant_id').notNull(),

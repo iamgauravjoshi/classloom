@@ -38,4 +38,16 @@ describe('authorization catalog', () => {
       'attendance_operator', 'finance_operator', 'auditor',
     ]);
   });
+
+  it('restricts staff directory permissions to school leadership and auditors', () => {
+    const permissionByKey = new Map(PERMISSION_CATALOG.map((permission) => [permission.key, permission]));
+    expect(permissionByKey.get('staff.read')).toMatchObject({ scopeKind: 'school', readOnly: true });
+    expect(permissionByKey.get('staff.manage')).toMatchObject({ scopeKind: 'school', readOnly: false });
+    const role = (key: string) => BUILT_IN_ROLE_TEMPLATES.find((item) => item.key === key)?.permissionKeys;
+    expect(role('tenant_admin')).toEqual(expect.arrayContaining(['staff.read', 'staff.manage']));
+    expect(role('school_admin')).toEqual(expect.arrayContaining(['staff.read', 'staff.manage']));
+    expect(role('principal')).toContain('staff.read');
+    expect(role('auditor')).toContain('staff.read');
+    expect(role('teacher')).not.toContain('staff.read');
+  });
 });
