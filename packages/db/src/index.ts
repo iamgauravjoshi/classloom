@@ -36,6 +36,15 @@ export {
   createStaffProfile,
   listSchoolStaff,
   readSchoolStaff,
+  listStaffAffiliationSchoolIds,
+  updateStaffProfile,
+  updateStaffAffiliation,
+  addStaffAffiliation,
+  upsertTeacherProfile,
+  linkStaffMembership,
+  unlinkStaffMembership,
+  listEligibleStaffAccounts,
+  isAssignableTeacher,
 } from './staff.js';
 export type { StaffScope, StaffProfileInput, StaffAffiliationInput, StaffCreateInput, StaffListFilters, StaffListPage, StaffRecord, StaffAudit } from './staff.js';
 export { withTenantContext } from './tenant-context.js';

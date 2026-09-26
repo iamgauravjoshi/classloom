@@ -1,3 +1,10 @@
+import { and, eq, gt, ilike, or, sql } from 'drizzle-orm';
+import type { TenantTransaction } from './client.js';
+import {
+  accounts, academicTeacherAssignments, membershipRoleAssignments, memberships, schools,
+  securityEvents, staffProfiles, staffSchoolAffiliations, teacherProfiles,
+} from './schema.js';
+
 export type StaffScope = { tenantId: string; schoolId: string };
 export type StaffProfileInput = {
   staffCode: string;
@@ -187,6 +194,193 @@ export async function listSchoolStaff(tx: TenantTransaction, scope: StaffScope, 
     nextCursor: rows.length > filters.limit && page.length ? Buffer.from(page[page.length - 1]!.sortKey, 'utf8').toString('base64url') : null,
   };
 }
-import { and, eq, gt, ilike, or, sql } from 'drizzle-orm';
-import type { TenantTransaction } from './client.js';
-import { schools, securityEvents, staffProfiles, staffSchoolAffiliations, teacherProfiles } from './schema.js';
+
+async function auditStaff(tx: TenantTransaction, scope: StaffScope, staffId: string, eventType: string, audit: StaffAudit, metadata: Record<string, string> = {}) {
+  await tx.insert(securityEvents).values({
+    eventType, accountId: audit.actorAccountId, tenantId: scope.tenantId, requestId: audit.requestId,
+    metadata: { staffId, schoolId: scope.schoolId, ...metadata },
+  });
+}
+
+export async function listStaffAffiliationSchoolIds(tx: TenantTransaction, tenantId: string, staffId: string): Promise<string[]> {
+  const rows = await tx.select({ schoolId: staffSchoolAffiliations.schoolId }).from(staffSchoolAffiliations).where(and(
+    eq(staffSchoolAffiliations.tenantId, tenantId), eq(staffSchoolAffiliations.staffId, staffId),
+  ));
+  return rows.map((row) => row.schoolId);
+}
+
+async function hasTeacherRecord(tx: TenantTransaction, tenantId: string, staffId: string) {
+  const [record] = await tx.select({ staffId: teacherProfiles.staffId }).from(teacherProfiles).where(and(
+    eq(teacherProfiles.tenantId, tenantId), eq(teacherProfiles.staffId, staffId),
+  )).limit(1);
+  return Boolean(record);
+}
+
+async function activeMemberAtSchool(tx: TenantTransaction, scope: StaffScope, membershipId: string): Promise<boolean> {
+  const [member] = await tx.select({ id: memberships.id }).from(memberships)
+    .innerJoin(accounts, eq(accounts.id, memberships.accountId))
+    .innerJoin(membershipRoleAssignments, and(
+      eq(membershipRoleAssignments.tenantId, memberships.tenantId),
+      eq(membershipRoleAssignments.membershipId, memberships.id),
+    ))
+    .where(and(
+      eq(memberships.tenantId, scope.tenantId), eq(memberships.id, membershipId),
+      eq(memberships.status, 'active'), eq(accounts.status, 'active'),
+      or(eq(membershipRoleAssignments.scopeKind, 'tenant'), eq(membershipRoleAssignments.schoolId, scope.schoolId)),
+    )).limit(1);
+  return Boolean(member);
+}
+
+async function requireMemberAtSchool(tx: TenantTransaction, scope: StaffScope, membershipId: string) {
+  if (!await activeMemberAtSchool(tx, scope, membershipId)) {
+    throw new StaffError('INVALID', 'The linked account must be active and have access to this school');
+  }
+}
+
+async function requireActiveMembership(tx: TenantTransaction, tenantId: string, membershipId: string) {
+  const [member] = await tx.select({ id: memberships.id }).from(memberships)
+    .innerJoin(accounts, eq(accounts.id, memberships.accountId))
+    .where(and(eq(memberships.tenantId, tenantId), eq(memberships.id, membershipId), eq(memberships.status, 'active'), eq(accounts.status, 'active')))
+    .limit(1);
+  if (!member) throw new StaffError('INVALID', 'The linked account and tenant membership must be active');
+}
+
+export async function updateStaffProfile(tx: TenantTransaction, scope: StaffScope, staffId: string, changes: Partial<Omit<StaffProfileInput, 'staffCode'>>, audit: StaffAudit) {
+  const current = await readSchoolStaff(tx, scope, staffId);
+  const normalized = normalizeStaffProfile({
+    staffCode: current.staffCode,
+    givenName: changes.givenName ?? current.givenName,
+    familyName: changes.familyName ?? current.familyName,
+    preferredName: changes.preferredName === undefined ? current.preferredName : changes.preferredName,
+    workEmail: changes.workEmail === undefined ? current.workEmail : changes.workEmail,
+    phone: changes.phone === undefined ? current.phone : changes.phone,
+  });
+  await tx.update(staffProfiles).set({ ...normalized, updatedAt: new Date() }).where(and(
+    eq(staffProfiles.tenantId, scope.tenantId), eq(staffProfiles.id, staffId),
+  ));
+  await auditStaff(tx, scope, staffId, 'staff_profile_updated', audit, { changedFields: Object.keys(changes).sort().join(',') });
+  return readSchoolStaff(tx, scope, staffId);
+}
+
+export async function updateStaffAffiliation(tx: TenantTransaction, scope: StaffScope, staffId: string, changes: Partial<StaffAffiliationInput>, audit: StaffAudit) {
+  const current = await readSchoolStaff(tx, scope, staffId);
+  const values = normalizedAffiliation({
+    designation: changes.designation ?? current.designation,
+    kind: changes.kind ?? current.kind as 'staff' | 'teacher',
+    status: changes.status ?? current.status as 'active' | 'inactive',
+    startDate: changes.startDate === undefined ? current.startDate : changes.startDate,
+  });
+  if (values.kind === 'teacher' && !await hasTeacherRecord(tx, scope.tenantId, staffId)) {
+    throw new StaffError('INVALID', 'Create teacher details before marking this affiliation as a teacher');
+  }
+  if (values.status === 'active' && current.membershipId) await requireMemberAtSchool(tx, scope, current.membershipId);
+  await tx.update(staffSchoolAffiliations).set({ ...values, updatedAt: new Date() }).where(and(
+    eq(staffSchoolAffiliations.tenantId, scope.tenantId), eq(staffSchoolAffiliations.schoolId, scope.schoolId), eq(staffSchoolAffiliations.staffId, staffId),
+  ));
+  await auditStaff(tx, scope, staffId, 'staff_affiliation_updated', audit, { beforeStatus: current.status, afterStatus: values.status, beforeKind: current.kind, afterKind: values.kind });
+  return readSchoolStaff(tx, scope, staffId);
+}
+
+export async function addStaffAffiliation(tx: TenantTransaction, source: StaffScope, targetSchoolId: string, staffId: string, input: StaffAffiliationInput, audit: StaffAudit) {
+  const current = await readSchoolStaff(tx, source, staffId);
+  const values = normalizedAffiliation(input);
+  const [targetSchool] = await tx.select({ id: schools.id }).from(schools).where(and(
+    eq(schools.tenantId, source.tenantId), eq(schools.id, targetSchoolId),
+  )).limit(1);
+  if (!targetSchool) throw new StaffError('NOT_FOUND', 'Destination school was not found');
+  if (values.kind === 'teacher' && !await hasTeacherRecord(tx, source.tenantId, staffId)) {
+    throw new StaffError('INVALID', 'Create teacher details before adding a teacher affiliation');
+  }
+  if (values.status === 'active' && current.membershipId) await requireMemberAtSchool(tx, { ...source, schoolId: targetSchoolId }, current.membershipId);
+  try {
+    await tx.insert(staffSchoolAffiliations).values({ tenantId: source.tenantId, schoolId: targetSchoolId, staffId, ...values });
+  } catch (error) {
+    if (dbCode(error) === '23505') throw new StaffError('CONFLICT', 'This staff member already belongs to that school');
+    throw error;
+  }
+  await auditStaff(tx, source, staffId, 'staff_affiliation_added', audit, { targetSchoolId });
+  return readSchoolStaff(tx, { ...source, schoolId: targetSchoolId }, staffId);
+}
+
+export async function upsertTeacherProfile(tx: TenantTransaction, scope: StaffScope, staffId: string, input: StaffCreateInput['teacher'], audit: StaffAudit) {
+  await readSchoolStaff(tx, scope, staffId);
+  const [current] = await tx.select().from(teacherProfiles).where(and(
+    eq(teacherProfiles.tenantId, scope.tenantId), eq(teacherProfiles.staffId, staffId),
+  )).limit(1);
+  const values = normalizedTeacher({
+    qualification: input?.qualification === undefined ? current?.qualification : input.qualification,
+    specialization: input?.specialization === undefined ? current?.specialization : input.specialization,
+  });
+  await tx.insert(teacherProfiles).values({ tenantId: scope.tenantId, staffId, ...values })
+    .onConflictDoUpdate({ target: teacherProfiles.staffId, set: { ...values, updatedAt: new Date() } });
+  await auditStaff(tx, scope, staffId, 'teacher_profile_updated', audit);
+  return readSchoolStaff(tx, scope, staffId);
+}
+
+export async function linkStaffMembership(tx: TenantTransaction, scope: StaffScope, staffId: string, membershipId: string, audit: StaffAudit) {
+  const current = await readSchoolStaff(tx, scope, staffId);
+  if (current.membershipId === membershipId) return current;
+  if (current.membershipId) {
+    const [assignment] = await tx.select({ id: academicTeacherAssignments.id }).from(academicTeacherAssignments).where(and(
+      eq(academicTeacherAssignments.tenantId, scope.tenantId), eq(academicTeacherAssignments.membershipId, current.membershipId),
+    )).limit(1);
+    if (assignment) throw new StaffError('CONFLICT', 'This account has teaching assignments and cannot be replaced');
+  }
+  const affiliations = await tx.select({ schoolId: staffSchoolAffiliations.schoolId }).from(staffSchoolAffiliations).where(and(
+    eq(staffSchoolAffiliations.tenantId, scope.tenantId), eq(staffSchoolAffiliations.staffId, staffId), eq(staffSchoolAffiliations.status, 'active'),
+  ));
+  await requireActiveMembership(tx, scope.tenantId, membershipId);
+  for (const affiliation of affiliations) await requireMemberAtSchool(tx, { tenantId: scope.tenantId, schoolId: affiliation.schoolId }, membershipId);
+  try {
+    await tx.update(staffProfiles).set({ membershipId, updatedAt: new Date() }).where(and(
+      eq(staffProfiles.tenantId, scope.tenantId), eq(staffProfiles.id, staffId),
+    ));
+  } catch (error) {
+    if (dbCode(error) === '23505') throw new StaffError('CONFLICT', 'This account is already linked to another staff member');
+    throw error;
+  }
+  await auditStaff(tx, scope, staffId, 'staff_account_linked', audit, { membershipId });
+  return readSchoolStaff(tx, scope, staffId);
+}
+
+export async function unlinkStaffMembership(tx: TenantTransaction, scope: StaffScope, staffId: string, audit: StaffAudit) {
+  const current = await readSchoolStaff(tx, scope, staffId);
+  if (!current.membershipId) return current;
+  const [assignment] = await tx.select({ id: academicTeacherAssignments.id }).from(academicTeacherAssignments).where(and(
+    eq(academicTeacherAssignments.tenantId, scope.tenantId), eq(academicTeacherAssignments.membershipId, current.membershipId),
+  )).limit(1);
+  if (assignment) throw new StaffError('CONFLICT', 'This account has teaching assignments and cannot be unlinked');
+  await tx.update(staffProfiles).set({ membershipId: null, updatedAt: new Date() }).where(and(
+    eq(staffProfiles.tenantId, scope.tenantId), eq(staffProfiles.id, staffId),
+  ));
+  await auditStaff(tx, scope, staffId, 'staff_account_unlinked', audit, { membershipId: current.membershipId });
+  return readSchoolStaff(tx, scope, staffId);
+}
+
+export async function listEligibleStaffAccounts(tx: TenantTransaction, scope: StaffScope) {
+  return tx.selectDistinct({ id: memberships.id, email: accounts.normalizedEmail, displayName: accounts.displayName })
+    .from(memberships)
+    .innerJoin(accounts, eq(accounts.id, memberships.accountId))
+    .innerJoin(membershipRoleAssignments, and(
+      eq(membershipRoleAssignments.tenantId, memberships.tenantId), eq(membershipRoleAssignments.membershipId, memberships.id),
+    ))
+    .leftJoin(staffProfiles, and(eq(staffProfiles.tenantId, memberships.tenantId), eq(staffProfiles.membershipId, memberships.id)))
+    .where(and(
+      eq(memberships.tenantId, scope.tenantId), eq(memberships.status, 'active'), eq(accounts.status, 'active'),
+      or(eq(membershipRoleAssignments.scopeKind, 'tenant'), eq(membershipRoleAssignments.schoolId, scope.schoolId)),
+      sql`${staffProfiles.id} is null`,
+    )).orderBy(accounts.normalizedEmail);
+}
+
+export async function isAssignableTeacher(tx: TenantTransaction, scope: StaffScope, membershipId: string): Promise<boolean> {
+  const [record] = await tx.select({ staffId: staffProfiles.id }).from(staffProfiles)
+    .innerJoin(staffSchoolAffiliations, and(
+      eq(staffSchoolAffiliations.tenantId, staffProfiles.tenantId), eq(staffSchoolAffiliations.staffId, staffProfiles.id),
+    ))
+    .innerJoin(teacherProfiles, and(eq(teacherProfiles.tenantId, staffProfiles.tenantId), eq(teacherProfiles.staffId, staffProfiles.id)))
+    .where(and(
+      eq(staffProfiles.tenantId, scope.tenantId), eq(staffProfiles.membershipId, membershipId),
+      eq(staffSchoolAffiliations.schoolId, scope.schoolId), eq(staffSchoolAffiliations.status, 'active'), eq(staffSchoolAffiliations.kind, 'teacher'),
+    )).limit(1);
+  return Boolean(record) && await activeMemberAtSchool(tx, scope, membershipId);
+}
