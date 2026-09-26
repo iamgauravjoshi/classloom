@@ -74,6 +74,7 @@ export {
   updateGuardianProfile,
   setGuardianStatus,
   createOrUpdateGuardianRelationship,
+  updateGuardianRelationship,
   listStudentGuardians,
   listGuardianStudents,
   linkStudentMembership,

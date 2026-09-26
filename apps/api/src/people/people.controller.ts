@@ -3,6 +3,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
 import {
   addStaffAffiliation, createStaffProfile, linkStaffMembership, listEligibleStaffAccounts,
+  listEligibleGuardianAccounts, listEligibleStudentAccounts,
   listSchoolStaff, listStaffAffiliationSchoolIds, listStaffSchools, readSchoolStaff,
   StaffError, unlinkStaffMembership, updateStaffAffiliation, updateStaffProfile,
   upsertTeacherProfile, withTenantContext, type TenantTransaction,
@@ -13,6 +14,7 @@ import { CsrfGuard } from '../auth/csrf.guard.js';
 import { parseRequest } from '../common/request-validation.js';
 import { DatabaseService } from '../database/database.service.js';
 import { PeopleService, type PeopleActor } from './people.service.js';
+import { StudentPeopleService } from './student-people.service.js';
 
 const uuid = z.string().uuid();
 const optionalText = (maximum: number) => z.string().trim().max(maximum).nullable().optional();
@@ -73,7 +75,11 @@ export class PeopleSchoolsController {
 @Controller('people/schools/:schoolId')
 @UseGuards(AuthGuard, CsrfGuard)
 export class PeopleController {
-  constructor(@Inject(DatabaseService) private readonly database: DatabaseService, @Inject(PeopleService) private readonly people: PeopleService) {}
+  constructor(
+    @Inject(DatabaseService) private readonly database: DatabaseService,
+    @Inject(PeopleService) private readonly people: PeopleService,
+    @Inject(StudentPeopleService) private readonly studentPeople: StudentPeopleService,
+  ) {}
 
   private async detail(tx: TenantTransaction, actor: PeopleActor, schoolId: string, staffId: string) {
     const record = await readSchoolStaff(tx, { tenantId: actor.tenantId, schoolId }, staffId);
@@ -110,11 +116,18 @@ export class PeopleController {
   }
 
   @Get('eligible-accounts')
-  async accounts(@Req() request: AuthenticatedRequest, @Param('schoolId') schoolIdValue: string) {
+  async accounts(@Req() request: AuthenticatedRequest, @Param('schoolId') schoolIdValue: string, @Query('profileType') profileTypeValue?: string) {
     const actor = actorFrom(request);
     const schoolId = parseRequest(uuid, schoolIdValue);
-    await this.people.requireSchoolManage(actor, schoolId);
-    return withTenantContext(this.database.db, actor.tenantId, (tx) => listEligibleStaffAccounts(tx, { tenantId: actor.tenantId, schoolId }));
+    const profileType = profileTypeValue ? parseRequest(z.enum(['staff', 'student', 'guardian']), profileTypeValue) : 'staff';
+    if (profileType === 'staff') await this.people.requireSchoolManage(actor, schoolId);
+    else if (profileType === 'student') await this.studentPeople.requireStudentManage(actor, schoolId);
+    else await this.studentPeople.requireGuardianManage(actor, schoolId);
+    return withTenantContext(this.database.db, actor.tenantId, (tx) => profileType === 'staff'
+      ? listEligibleStaffAccounts(tx, { tenantId: actor.tenantId, schoolId })
+      : profileType === 'student'
+        ? listEligibleStudentAccounts(tx, actor.tenantId)
+        : listEligibleGuardianAccounts(tx, actor.tenantId));
   }
 
   @Post('staff')

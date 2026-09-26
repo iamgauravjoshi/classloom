@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, inArray, or, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, ilike, inArray, or, sql } from 'drizzle-orm';
 import type { TenantTransaction } from './client.js';
 import {
   accounts,
@@ -222,14 +222,21 @@ export async function listStudentProfilesByIds(
   tx: TenantTransaction,
   tenantId: string,
   studentIds: string[],
-  options: { cursor?: string; limit?: number } = {},
+  options: { cursor?: string; limit?: number; q?: string; status?: 'active' | 'inactive' } = {},
 ) {
   const limit = Math.min(Math.max(options.limit ?? 25, 1), 100);
   if (!studentIds.length) return { items: [], nextCursor: null as string | null };
+  const q = options.q?.trim();
+  const pattern = q ? `%${q.replace(/[\\%_]/g, '\\$&')}%` : undefined;
   const rows = await tx.select().from(studentProfiles).where(and(
     eq(studentProfiles.tenantId, tenantId),
     inArray(studentProfiles.id, studentIds),
     options.cursor ? gt(studentProfiles.id, options.cursor) : undefined,
+    options.status ? eq(studentProfiles.status, options.status) : undefined,
+    pattern ? or(
+      ilike(studentProfiles.studentCode, pattern), ilike(studentProfiles.givenName, pattern),
+      ilike(studentProfiles.familyName, pattern), ilike(studentProfiles.preferredName, pattern),
+    ) : undefined,
   )).orderBy(asc(studentProfiles.id)).limit(limit + 1);
   const page = rows.slice(0, limit);
   return { items: page, nextCursor: rows.length > limit ? page.at(-1)!.id : null };
@@ -316,14 +323,21 @@ export async function listGuardianProfilesByIds(
   tx: TenantTransaction,
   tenantId: string,
   guardianIds: string[],
-  options: { cursor?: string; limit?: number } = {},
+  options: { cursor?: string; limit?: number; q?: string; status?: 'active' | 'inactive' } = {},
 ) {
   const limit = Math.min(Math.max(options.limit ?? 25, 1), 100);
   if (!guardianIds.length) return { items: [], nextCursor: null as string | null };
+  const q = options.q?.trim();
+  const pattern = q ? `%${q.replace(/[\\%_]/g, '\\$&')}%` : undefined;
   const rows = await tx.select().from(guardianProfiles).where(and(
     eq(guardianProfiles.tenantId, tenantId),
     inArray(guardianProfiles.id, guardianIds),
     options.cursor ? gt(guardianProfiles.id, options.cursor) : undefined,
+    options.status ? eq(guardianProfiles.status, options.status) : undefined,
+    pattern ? or(
+      ilike(guardianProfiles.guardianCode, pattern), ilike(guardianProfiles.givenName, pattern),
+      ilike(guardianProfiles.familyName, pattern), ilike(guardianProfiles.preferredName, pattern),
+    ) : undefined,
   )).orderBy(asc(guardianProfiles.id)).limit(limit + 1);
   const page = rows.slice(0, limit);
   return { items: page, nextCursor: rows.length > limit ? page.at(-1)!.id : null };
@@ -404,6 +418,38 @@ export async function createOrUpdateGuardianRelationship(
     relationshipId: record.id, studentId, guardianId,
   });
   return record;
+}
+
+export async function updateGuardianRelationship(
+  tx: TenantTransaction,
+  tenantId: string,
+  studentId: string,
+  relationshipId: string,
+  changes: Partial<GuardianRelationshipInput>,
+  auditContext: StudentPeopleAudit,
+) {
+  const [current] = await tx.select().from(studentGuardianRelationships).where(and(
+    eq(studentGuardianRelationships.tenantId, tenantId),
+    eq(studentGuardianRelationships.studentId, studentId),
+    eq(studentGuardianRelationships.id, relationshipId),
+  )).limit(1);
+  if (!current) throw new StudentPeopleError('NOT_FOUND', 'Guardian relationship was not found');
+  const values = normalizeGuardianRelationship({
+    relationshipType: changes.relationshipType ?? current.relationshipType as GuardianRelationshipType,
+    primaryContact: changes.primaryContact ?? current.primaryContact,
+    emergencyContact: changes.emergencyContact ?? current.emergencyContact,
+    authorizedPickup: changes.authorizedPickup ?? current.authorizedPickup,
+    financialResponsibility: changes.financialResponsibility ?? current.financialResponsibility,
+    portalAccess: changes.portalAccess ?? current.portalAccess,
+    status: changes.status ?? current.status as 'active' | 'inactive',
+  });
+  const [updated] = await tx.update(studentGuardianRelationships).set({ ...values, updatedAt: new Date() }).where(and(
+    eq(studentGuardianRelationships.tenantId, tenantId), eq(studentGuardianRelationships.id, relationshipId),
+  )).returning();
+  await audit(tx, tenantId, 'student_guardian_relationship_updated', auditContext, {
+    relationshipId, studentId, guardianId: current.guardianId,
+  });
+  return updated!;
 }
 
 export async function listStudentGuardians(tx: TenantTransaction, tenantId: string, studentId: string) {
