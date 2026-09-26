@@ -92,7 +92,33 @@ export type {
   GuardianRelationshipType,
 } from './students.js';
 export { withTenantContext } from './tenant-context.js';
-export { AcademicSetupError, validateAcademicCode, validateAcademicSession, listAcademicSchools, listActiveAcademicMembers, readAcademicSetup, createAcademicSession, createAcademicClass, createAcademicSection, createAcademicSubject, createAcademicAssignment, activateAcademicSession } from './academics.js';
+export { AcademicSetupError, validateAcademicCode, validateAcademicSession, resolveEnrollmentPlacement, listAcademicSchools, listActiveAcademicMembers, readAcademicSetup, createAcademicSession, createAcademicClass, createAcademicSection, createAcademicSubject, createAcademicAssignment, activateAcademicSession } from './academics.js';
+export type { EnrollmentPlacementInput } from './academics.js';
+export {
+  EnrollmentError,
+  normalizeSchoolEnrollmentInput,
+  normalizeAcademicEnrollmentInput,
+  requireActiveEnrollment,
+  createSchoolEnrollment,
+  createAcademicEnrollment,
+  transferAcademicEnrollment,
+  withdrawAcademicEnrollment,
+  completeAcademicEnrollment,
+  listStudentSchoolEnrollments,
+  listAcademicEnrollmentHistory,
+  listActiveStudentSchoolIds,
+  listActiveGuardianSchoolIds,
+  listSchoolStudentIds,
+  listSchoolGuardianIds,
+} from './enrollment.js';
+export type {
+  EnrollmentScope,
+  EnrollmentAudit,
+  SchoolEnrollmentInput,
+  AcademicEnrollmentInput,
+  EnrollmentCloseInput,
+  EnrollmentPlacement,
+} from './enrollment.js';
 export { withAccountContext } from './account-context.js';
 export { seedTenantAuthorization } from './authorization-seeding.js';
 export { PERMISSION_CATALOG, BUILT_IN_ROLE_TEMPLATES } from './authorization-catalog.js';
