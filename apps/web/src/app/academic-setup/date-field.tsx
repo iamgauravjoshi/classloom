@@ -16,6 +16,7 @@ export function DateField({
   onChange,
   error,
   earliestDate,
+  required = true,
 }: {
   id: string;
   label: string;
@@ -23,6 +24,7 @@ export function DateField({
   onChange: (value: string) => void;
   error?: string;
   earliestDate?: string;
+  required?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const selected = value ? parseDateOnly(value) : undefined;
@@ -38,7 +40,7 @@ export function DateField({
               type="button"
               variant="outline"
               aria-invalid={Boolean(error) || undefined}
-              aria-required="true"
+              aria-required={required}
               className="w-full justify-between"
             />
           }
@@ -60,6 +62,7 @@ export function DateField({
           />
         </PopoverContent>
       </Popover>
+      {!required && selected && <Button type="button" variant="ghost" size="sm" onClick={() => onChange("")}>Clear date</Button>}
       {error && <FieldError>{error}</FieldError>}
     </Field>
   );

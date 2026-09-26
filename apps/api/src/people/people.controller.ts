@@ -65,7 +65,7 @@ export class PeopleSchoolsController {
     const actor = actorFrom(request);
     const candidates = await withTenantContext(this.database.db, actor.tenantId, (tx) => listStaffSchools(tx, actor.tenantId));
     const allowed = await Promise.all(candidates.map(async (school) => ({ school, allowed: await this.people.canReadSchool(actor, school.id) })));
-    return allowed.filter((item) => item.allowed).map((item) => item.school);
+    return Promise.all(allowed.filter((item) => item.allowed).map(async ({ school }) => ({ ...school, canManageStaff: await this.people.canManageSchool(actor, school.id) })));
   }
 }
 
@@ -78,7 +78,7 @@ export class PeopleController {
   private async detail(tx: TenantTransaction, actor: PeopleActor, schoolId: string, staffId: string) {
     const record = await readSchoolStaff(tx, { tenantId: actor.tenantId, schoolId }, staffId);
     const schoolIds = await listStaffAffiliationSchoolIds(tx, actor.tenantId, staffId);
-    return { ...record, canEditShared: await this.people.canEditShared(actor, schoolIds) };
+    return { ...record, canEditShared: await this.people.canEditShared(actor, schoolIds), canManageAffiliation: await this.people.canManageSchool(actor, schoolId) };
   }
 
   private async sharedMutation<T>(actor: PeopleActor, schoolId: string, staffId: string, work: (tx: TenantTransaction) => Promise<T>): Promise<T> {

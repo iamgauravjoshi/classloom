@@ -8,7 +8,7 @@ export type AcademicClass = { id: string; sessionId: string; name: string; code:
 export type AcademicSection = { id: string; sessionId: string; classId: string; name: string; code: string; capacity: number | null };
 export type AcademicSubject = { id: string; sessionId: string; name: string; code: string };
 export type AcademicAssignment = { id: string; sessionId: string; sectionId: string; subjectId: string; membershipId: string };
-export type AcademicSetup = { school: AcademicSchool; sessions: AcademicSession[]; classes: AcademicClass[]; sections: AcademicSection[]; subjects: AcademicSubject[]; assignments: AcademicAssignment[] };
+export type AcademicSetup = { school: AcademicSchool; sessions: AcademicSession[]; classes: AcademicClass[]; sections: AcademicSection[]; subjects: AcademicSubject[]; assignments: AcademicAssignment[]; assignmentAccounts: AcademicStaffAccount[] };
 export type AcademicStaffAccount = { id: string; email: string; displayName: string | null };
 
 async function request<T>(path: string, body?: Record<string, string | number | undefined>) {
