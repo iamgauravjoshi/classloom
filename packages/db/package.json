@@ -10,6 +10,7 @@
     "migrate": "tsx src/migrate.ts",
     "setup-runtime-role": "tsx src/setup-runtime-role.ts",
     "provision-tenant": "tsx src/provision-tenant.ts",
+    "seed-phase6-demo": "tsx src/seed-phase6-demo.ts",
     "check": "tsx src/check.ts",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
@@ -21,6 +22,7 @@
     "postgres": "^3.4.9"
   },
   "devDependencies": {
+    "@faker-js/faker": "^10.6.0",
     "@types/node": "^26.6.2",
     "drizzle-kit": "^0.31.11",
     "tsx": "^4.23.15",

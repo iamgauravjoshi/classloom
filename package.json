@@ -17,6 +17,7 @@
     "db:migrate": "dotenv -e .env -- pnpm --filter @classloom/db migrate",
     "db:setup-runtime-role": "dotenv -e .env -- pnpm --filter @classloom/db setup-runtime-role",
     "db:provision-tenant": "dotenv -e .env -- pnpm --filter @classloom/db provision-tenant",
+    "db:seed-phase6-demo": "dotenv -e .env -- pnpm --filter @classloom/db seed-phase6-demo",
     "db:check": "dotenv -e .env -- pnpm --filter @classloom/db check"
   },
   "devDependencies": {
