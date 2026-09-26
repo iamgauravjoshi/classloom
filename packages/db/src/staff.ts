@@ -167,6 +167,11 @@ export async function readSchoolStaff(tx: TenantTransaction, scope: StaffScope, 
 export type StaffRecord = Awaited<ReturnType<typeof readSchoolStaff>>;
 export type StaffListPage = { items: StaffRecord[]; nextCursor: string | null };
 
+export async function listStaffSchools(tx: TenantTransaction, tenantId: string) {
+  return tx.select({ id: schools.id, name: schools.name, code: schools.code })
+    .from(schools).where(eq(schools.tenantId, tenantId)).orderBy(schools.name);
+}
+
 export async function listSchoolStaff(tx: TenantTransaction, scope: StaffScope, input: StaffListFilters): Promise<StaffListPage> {
   const filters = normalizeStaffListFilters(input);
   let cursorKey: string | undefined;

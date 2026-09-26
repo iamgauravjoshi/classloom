@@ -35,6 +35,7 @@ export {
   normalizeStaffListFilters,
   createStaffProfile,
   listSchoolStaff,
+  listStaffSchools,
   readSchoolStaff,
   listStaffAffiliationSchoolIds,
   updateStaffProfile,
