@@ -8,6 +8,12 @@ export const PERMISSION_CATALOG = [
   { key: 'school.manage', family: 'school', scopeKind: 'school', action: 'manage', readOnly: false },
   { key: 'staff.read', family: 'staff', scopeKind: 'school', action: 'read', readOnly: true },
   { key: 'staff.manage', family: 'staff', scopeKind: 'school', action: 'manage', readOnly: false },
+  { key: 'student.read', family: 'student', scopeKind: 'school', action: 'read', readOnly: true },
+  { key: 'student.manage', family: 'student', scopeKind: 'school', action: 'manage', readOnly: false },
+  { key: 'guardian.read', family: 'guardian', scopeKind: 'school', action: 'read', readOnly: true },
+  { key: 'guardian.manage', family: 'guardian', scopeKind: 'school', action: 'manage', readOnly: false },
+  { key: 'enrollment.read', family: 'enrollment', scopeKind: 'school', action: 'read', readOnly: true },
+  { key: 'enrollment.manage', family: 'enrollment', scopeKind: 'school', action: 'manage', readOnly: false },
   { key: 'campus.read', family: 'campus', scopeKind: 'campus', action: 'read', readOnly: true },
   { key: 'campus.manage', family: 'campus', scopeKind: 'campus', action: 'manage', readOnly: false },
   { key: 'attendance.read', family: 'attendance', scopeKind: 'campus', action: 'read', readOnly: true },
@@ -34,6 +40,7 @@ export const BUILT_IN_ROLE_TEMPLATES = [
     permissionKeys: [
       'school.read', 'school.manage', 'campus.read', 'campus.manage',
       'staff.read', 'staff.manage',
+      'student.read', 'student.manage', 'guardian.read', 'guardian.manage', 'enrollment.read', 'enrollment.manage',
       'attendance.read', 'attendance.record', 'marks.read', 'marks.enter',
       'results.publish', 'finance.read', 'payments.record', 'payments.adjust', 'reports.export',
     ],
@@ -41,7 +48,7 @@ export const BUILT_IN_ROLE_TEMPLATES = [
   {
     key: 'principal', name: 'Principal',
     permissionKeys: [
-      'school.read', 'staff.read', 'campus.read', 'attendance.read', 'marks.read',
+      'school.read', 'staff.read', 'student.read', 'guardian.read', 'enrollment.read', 'campus.read', 'attendance.read', 'marks.read',
       'marks.enter', 'results.publish', 'finance.read', 'reports.export',
     ],
   },

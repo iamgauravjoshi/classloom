@@ -50,4 +50,23 @@ describe('authorization catalog', () => {
     expect(role('auditor')).toContain('staff.read');
     expect(role('teacher')).not.toContain('staff.read');
   });
+
+  it('restricts student guardian and enrollment permissions to approved school roles', () => {
+    const permissionByKey = new Map(PERMISSION_CATALOG.map((permission) => [permission.key, permission]));
+    expect(permissionByKey.get('student.read')).toEqual({ key: 'student.read', family: 'student', scopeKind: 'school', action: 'read', readOnly: true });
+    expect(permissionByKey.get('student.manage')).toEqual({ key: 'student.manage', family: 'student', scopeKind: 'school', action: 'manage', readOnly: false });
+    expect(permissionByKey.get('guardian.read')).toEqual({ key: 'guardian.read', family: 'guardian', scopeKind: 'school', action: 'read', readOnly: true });
+    expect(permissionByKey.get('guardian.manage')).toEqual({ key: 'guardian.manage', family: 'guardian', scopeKind: 'school', action: 'manage', readOnly: false });
+    expect(permissionByKey.get('enrollment.read')).toEqual({ key: 'enrollment.read', family: 'enrollment', scopeKind: 'school', action: 'read', readOnly: true });
+    expect(permissionByKey.get('enrollment.manage')).toEqual({ key: 'enrollment.manage', family: 'enrollment', scopeKind: 'school', action: 'manage', readOnly: false });
+
+    const role = (key: string) => BUILT_IN_ROLE_TEMPLATES.find((item) => item.key === key)?.permissionKeys;
+    const read = ['student.read', 'guardian.read', 'enrollment.read'];
+    const manage = ['student.manage', 'guardian.manage', 'enrollment.manage'];
+    expect(role('tenant_admin')).toEqual(expect.arrayContaining([...read, ...manage]));
+    expect(role('school_admin')).toEqual(expect.arrayContaining([...read, ...manage]));
+    expect(role('principal')).toEqual(expect.arrayContaining(read));
+    expect(role('auditor')).toEqual(expect.arrayContaining(read));
+    expect(role('teacher')).not.toEqual(expect.arrayContaining(read));
+  });
 });
