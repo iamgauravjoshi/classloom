@@ -92,9 +92,20 @@ describe.skipIf(!enabled)('academic setup API', () => {
     expect(subject.status).toBe(201);
     const staff = await request(app.getHttpServer()).get(`${base}/staff`).set('Cookie', cookie);
     expect(staff.status).toBe(200);
-    expect(staff.body).toEqual([expect.objectContaining({ id: administratorMembershipId })]);
+    expect(staff.body).toEqual([]);
     const disabledAssignment = await request(app.getHttpServer()).post(`${base}/sections/${section.body.id}/assignments`).set({ ...headers, Cookie: cookie }).send({ subjectId: subject.body.id, membershipId: disabledMembershipId });
     expect(disabledAssignment.status).toBe(404);
+    const unlinkedAssignment = await request(app.getHttpServer()).post(`${base}/sections/${section.body.id}/assignments`).set({ ...headers, Cookie: cookie }).send({ subjectId: subject.body.id, membershipId: administratorMembershipId });
+    expect(unlinkedAssignment.status).toBe(400);
+    expect(unlinkedAssignment.body.message).toMatch(/teacher profile/i);
+    const person = await request(app.getHttpServer()).post(`/api/v1/people/schools/${schoolId}/staff`).set({ ...headers, Cookie: cookie }).send({
+      staffCode: 'MATH-1', givenName: 'Priya', familyName: 'Sharma', designation: 'Mathematics Teacher', kind: 'teacher',
+    });
+    expect(person.status).toBe(201);
+    const linked = await request(app.getHttpServer()).put(`/api/v1/people/schools/${schoolId}/staff/${person.body.id}/account`).set({ ...headers, Cookie: cookie }).send({ membershipId: administratorMembershipId });
+    expect(linked.status).toBe(200);
+    const eligible = await request(app.getHttpServer()).get(`${base}/staff`).set('Cookie', cookie);
+    expect(eligible.body).toEqual([expect.objectContaining({ id: administratorMembershipId, displayName: 'Priya Sharma' })]);
     const assignment = await request(app.getHttpServer()).post(`${base}/sections/${section.body.id}/assignments`).set({ ...headers, Cookie: cookie }).send({ subjectId: subject.body.id, membershipId: administratorMembershipId });
     expect(assignment.status).toBe(201);
     const duplicate = await request(app.getHttpServer()).post(`${base}/sections/${section.body.id}/assignments`).set({ ...headers, Cookie: cookie }).send({ subjectId: subject.body.id, membershipId: administratorMembershipId });
@@ -102,9 +113,16 @@ describe.skipIf(!enabled)('academic setup API', () => {
     const active = await request(app.getHttpServer()).post(`${base}/sessions/${sessionId}/activate`).set({ ...headers, Cookie: cookie }).send({});
     expect(active.status).toBe(201);
     expect(active.body.status).toBe('active');
+    const science = await request(app.getHttpServer()).post(`${base}/sessions/${sessionId}/subjects`).set({ ...headers, Cookie: cookie }).send({ name: 'Science', code: 'SCI' });
+    expect(science.status).toBe(201);
+    await admin`insert into academic_teacher_assignments (tenant_id, school_id, session_id, section_id, subject_id, membership_id) values (${tenantId}, ${schoolId}, ${sessionId}, ${section.body.id}, ${science.body.id}, ${disabledMembershipId})`;
     const setup = await request(app.getHttpServer()).get(`${base}/setup`).set('Cookie', cookie);
     expect(setup.status).toBe(200);
     expect(setup.body).toMatchObject({ school: { id: schoolId }, sessions: [expect.objectContaining({ status: 'active' })] });
+    expect(setup.body.assignmentAccounts).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: administratorMembershipId }),
+      expect.objectContaining({ id: disabledMembershipId, email: disabledEmail }),
+    ]));
   });
 
   it('returns useful client errors for invalid academic data', async () => {

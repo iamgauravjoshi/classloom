@@ -91,8 +91,11 @@ function SidebarContents({ onNavigate }: { onNavigate?: () => void }) {
         <Link href="/academic-setup" className={`nav-row ${pathname === "/academic-setup" ? "nav-row-active" : ""}`} aria-current={pathname === "/academic-setup" ? "page" : undefined} onClick={onNavigate}>
           <School size={18} /><span>Academic Setup</span><ChevronRight className="nav-chevron" size={16} />
         </Link>
+        <Link href="/staff" className={`nav-row ${pathname === "/staff" ? "nav-row-active" : ""}`} aria-current={pathname === "/staff" ? "page" : undefined} onClick={onNavigate}>
+          <GraduationCap size={18} /><span>Teachers & Staff</span><ChevronRight className="nav-chevron" size={16} />
+        </Link>
         <p className="nav-caption nav-caption-spaced">SCHOOL MANAGEMENT <span className="preview-label">SOON</span></p>
-        {upcomingSections.filter((section) => section.icon !== "classes").map((section) => {
+        {upcomingSections.filter((section) => section.icon !== "classes" && section.icon !== "teachers").map((section) => {
           const Icon = sectionIcons[section.icon];
           return (
             <div

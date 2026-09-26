@@ -1,13 +1,14 @@
 import { BadRequestException, Body, ConflictException, Controller, ForbiddenException, Get, Inject, NotFoundException, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
-import { AcademicSetupError, activateAcademicSession, createAcademicAssignment, createAcademicClass, createAcademicSection, createAcademicSession, createAcademicSubject, listAcademicSchools, listActiveAcademicMembers, readAcademicSetup, withTenantContext } from '@classloom/db';
+import { AcademicSetupError, activateAcademicSession, createAcademicAssignment, createAcademicClass, createAcademicSection, createAcademicSession, createAcademicSubject, listAcademicSchools, readAcademicSetup, withTenantContext } from '@classloom/db';
 import type { AuthenticatedRequest } from '../auth/auth.types.js';
 import { AuthGuard } from '../auth/auth.guard.js';
 import { CsrfGuard } from '../auth/csrf.guard.js';
 import { AuthorizationService } from '../authorization/authorization.service.js';
 import { DatabaseService } from '../database/database.service.js';
 import { parseRequest } from '../common/request-validation.js';
+import { PeopleService } from '../people/people.service.js';
 
 const uuid = z.string().uuid();
 const named = z.object({ name: z.string().trim().min(2).max(120), code: z.string().trim().min(1).max(20) }).strict();
@@ -37,6 +38,7 @@ export class AcademicsController {
   constructor(
     @Inject(DatabaseService) private readonly database: DatabaseService,
     @Inject(AuthorizationService) private readonly authorization: AuthorizationService,
+    @Inject(PeopleService) private readonly people: PeopleService,
   ) {}
 
   private async scope(request: AuthenticatedRequest, schoolIdValue: string, permission: 'school.read' | 'school.manage') {
@@ -60,7 +62,7 @@ export class AcademicsController {
   @Get('staff')
   async staff(@Req() request: AuthenticatedRequest, @Param('schoolId') schoolId: string) {
     const scope = await this.scope(request, schoolId, 'school.read');
-    return withTenantContext(this.database.db, scope.tenantId, (tx) => listActiveAcademicMembers(tx, scope));
+    return withTenantContext(this.database.db, scope.tenantId, (tx) => this.people.listAssignableTeachers(tx, scope));
   }
 
   @Post('sessions')
@@ -103,7 +105,13 @@ export class AcademicsController {
     const scope = await this.scope(request, schoolId, 'school.manage');
     const sectionId = parse(uuid, sectionIdValue);
     const input = parse(assignmentInput, body);
-    try { return await withTenantContext(this.database.db, scope.tenantId, (tx) => createAcademicAssignment(tx, scope, sectionId, input)); }
+    try { return await withTenantContext(this.database.db, scope.tenantId, async (tx) => {
+      const created = await createAcademicAssignment(tx, scope, sectionId, input);
+      if (!await this.people.canAssignTeacher(tx, scope, input.membershipId)) {
+        throw new BadRequestException('Link an active teacher profile at this school before assigning this account');
+      }
+      return created;
+    }); }
     catch (error) { return mapError(error); }
   }
 

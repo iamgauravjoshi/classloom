@@ -71,6 +71,13 @@
       "when": 1790345326393,
       "tag": "0009_superb_sunset_bain",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790384536486,
+      "tag": "0010_narrow_blindfold",
+      "breakpoints": true
     }
   ]
 }

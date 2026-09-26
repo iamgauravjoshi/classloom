@@ -6,6 +6,8 @@ export const PERMISSION_CATALOG = [
   { key: 'memberships.suspend', family: 'memberships', scopeKind: 'tenant', action: 'suspend', readOnly: false },
   { key: 'school.read', family: 'school', scopeKind: 'school', action: 'read', readOnly: true },
   { key: 'school.manage', family: 'school', scopeKind: 'school', action: 'manage', readOnly: false },
+  { key: 'staff.read', family: 'staff', scopeKind: 'school', action: 'read', readOnly: true },
+  { key: 'staff.manage', family: 'staff', scopeKind: 'school', action: 'manage', readOnly: false },
   { key: 'campus.read', family: 'campus', scopeKind: 'campus', action: 'read', readOnly: true },
   { key: 'campus.manage', family: 'campus', scopeKind: 'campus', action: 'manage', readOnly: false },
   { key: 'attendance.read', family: 'attendance', scopeKind: 'campus', action: 'read', readOnly: true },
@@ -31,6 +33,7 @@ export const BUILT_IN_ROLE_TEMPLATES = [
     key: 'school_admin', name: 'School administrator',
     permissionKeys: [
       'school.read', 'school.manage', 'campus.read', 'campus.manage',
+      'staff.read', 'staff.manage',
       'attendance.read', 'attendance.record', 'marks.read', 'marks.enter',
       'results.publish', 'finance.read', 'payments.record', 'payments.adjust', 'reports.export',
     ],
@@ -38,7 +41,7 @@ export const BUILT_IN_ROLE_TEMPLATES = [
   {
     key: 'principal', name: 'Principal',
     permissionKeys: [
-      'school.read', 'campus.read', 'attendance.read', 'marks.read',
+      'school.read', 'staff.read', 'campus.read', 'attendance.read', 'marks.read',
       'marks.enter', 'results.publish', 'finance.read', 'reports.export',
     ],
   },

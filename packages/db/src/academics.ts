@@ -71,14 +71,19 @@ export async function readAcademicSetup(tx: TenantTransaction, scope: Scope) {
   if (!school) throw new AcademicSetupError('NOT_FOUND', 'School was not found');
   const predicate = (table: typeof academicSessions | typeof academicClasses | typeof academicSections | typeof academicSubjects | typeof academicTeacherAssignments) =>
     and(eq(table.tenantId, scope.tenantId), eq(table.schoolId, scope.schoolId));
-  const [sessions, classes, sections, subjects, assignments] = await Promise.all([
+  const [sessions, classes, sections, subjects, assignments, assignmentAccounts] = await Promise.all([
     tx.select().from(academicSessions).where(predicate(academicSessions)).orderBy(academicSessions.startDate),
     tx.select().from(academicClasses).where(predicate(academicClasses)).orderBy(academicClasses.sortOrder, academicClasses.name),
     tx.select().from(academicSections).where(predicate(academicSections)).orderBy(academicSections.name),
     tx.select().from(academicSubjects).where(predicate(academicSubjects)).orderBy(academicSubjects.name),
     tx.select().from(academicTeacherAssignments).where(predicate(academicTeacherAssignments)),
+    tx.selectDistinct({ id: memberships.id, email: accounts.normalizedEmail, displayName: accounts.displayName })
+      .from(academicTeacherAssignments)
+      .innerJoin(memberships, and(eq(memberships.tenantId, academicTeacherAssignments.tenantId), eq(memberships.id, academicTeacherAssignments.membershipId)))
+      .innerJoin(accounts, eq(accounts.id, memberships.accountId))
+      .where(predicate(academicTeacherAssignments)),
   ]);
-  return { school, sessions, classes, sections, subjects, assignments };
+  return { school, sessions, classes, sections, subjects, assignments, assignmentAccounts };
 }
 
 export async function createAcademicSession(tx: TenantTransaction, scope: Scope, input: AcademicSessionInput) {
