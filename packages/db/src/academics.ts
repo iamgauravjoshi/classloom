@@ -68,6 +68,44 @@ export async function resolveEnrollmentPlacement(tx: TenantTransaction, scope: S
   return placement;
 }
 
+export async function resolveEnrollmentPlacementByCodes(
+  tx: TenantTransaction,
+  scope: Scope,
+  input: { sessionCode: string; classCode: string; sectionCode: string },
+) {
+  const sessionCode = validateAcademicCode(input.sessionCode);
+  const classCode = validateAcademicCode(input.classCode);
+  const sectionCode = validateAcademicCode(input.sectionCode);
+  const [placement] = await tx.select({
+    sessionId: academicSessions.id,
+    sessionName: academicSessions.name,
+    sessionStartDate: academicSessions.startDate,
+    sessionEndDate: academicSessions.endDate,
+    sessionStatus: academicSessions.status,
+    classId: academicClasses.id,
+    className: academicClasses.name,
+    sectionId: academicSections.id,
+    sectionName: academicSections.name,
+  }).from(academicSections)
+    .innerJoin(academicClasses, and(
+      eq(academicClasses.tenantId, academicSections.tenantId), eq(academicClasses.schoolId, academicSections.schoolId),
+      eq(academicClasses.sessionId, academicSections.sessionId), eq(academicClasses.id, academicSections.classId),
+    ))
+    .innerJoin(academicSessions, and(
+      eq(academicSessions.tenantId, academicSections.tenantId), eq(academicSessions.schoolId, academicSections.schoolId),
+      eq(academicSessions.id, academicSections.sessionId),
+    ))
+    .where(and(
+      eq(academicSections.tenantId, scope.tenantId), eq(academicSections.schoolId, scope.schoolId),
+      sql`upper(trim(${academicSessions.code})) = ${sessionCode}`,
+      sql`upper(trim(${academicClasses.code})) = ${classCode}`,
+      sql`upper(trim(${academicSections.code})) = ${sectionCode}`,
+      ne(academicSessions.status, 'archived'),
+    )).limit(1);
+  if (!placement) throw new AcademicSetupError('NOT_FOUND', 'CSV academic session, class, or section was not found or is archived');
+  return placement;
+}
+
 function normalizedName(value: string): string {
   const name = value.trim();
   if (name.length < 2 || name.length > 120) throw new AcademicSetupError('INVALID', 'Name must be 2–120 characters');

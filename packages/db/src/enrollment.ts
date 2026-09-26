@@ -266,6 +266,28 @@ export async function listStudentSchoolEnrollments(tx: TenantTransaction, scope:
   )).orderBy(asc(studentSchoolEnrollments.admissionDate), asc(studentSchoolEnrollments.id));
 }
 
+export async function findActiveSchoolEnrollment(tx: TenantTransaction, scope: EnrollmentScope, studentId: string) {
+  const [record] = await tx.select().from(studentSchoolEnrollments).where(and(
+    eq(studentSchoolEnrollments.tenantId, scope.tenantId), eq(studentSchoolEnrollments.schoolId, scope.schoolId),
+    eq(studentSchoolEnrollments.studentId, studentId), eq(studentSchoolEnrollments.status, 'active'),
+  )).limit(1);
+  return record ?? null;
+}
+
+export async function findActiveAcademicEnrollment(
+  tx: TenantTransaction,
+  scope: EnrollmentScope,
+  studentId: string,
+  sessionId: string,
+) {
+  const [record] = await tx.select().from(studentAcademicEnrollments).where(and(
+    eq(studentAcademicEnrollments.tenantId, scope.tenantId), eq(studentAcademicEnrollments.schoolId, scope.schoolId),
+    eq(studentAcademicEnrollments.studentId, studentId), eq(studentAcademicEnrollments.sessionId, sessionId),
+    eq(studentAcademicEnrollments.status, 'active'),
+  )).limit(1);
+  return record ?? null;
+}
+
 export async function listAcademicEnrollmentHistory(tx: TenantTransaction, scope: EnrollmentScope, schoolEnrollmentId: string) {
   return tx.select().from(studentAcademicEnrollments).where(and(
     eq(studentAcademicEnrollments.tenantId, scope.tenantId), eq(studentAcademicEnrollments.schoolId, scope.schoolId),

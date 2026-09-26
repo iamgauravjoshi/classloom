@@ -93,7 +93,7 @@ export type {
   GuardianRelationshipType,
 } from './students.js';
 export { withTenantContext } from './tenant-context.js';
-export { AcademicSetupError, validateAcademicCode, validateAcademicSession, resolveEnrollmentPlacement, listAcademicSchools, listActiveAcademicMembers, readAcademicSetup, createAcademicSession, createAcademicClass, createAcademicSection, createAcademicSubject, createAcademicAssignment, activateAcademicSession } from './academics.js';
+export { AcademicSetupError, validateAcademicCode, validateAcademicSession, resolveEnrollmentPlacement, resolveEnrollmentPlacementByCodes, listAcademicSchools, listActiveAcademicMembers, readAcademicSetup, createAcademicSession, createAcademicClass, createAcademicSection, createAcademicSubject, createAcademicAssignment, activateAcademicSession } from './academics.js';
 export type { EnrollmentPlacementInput } from './academics.js';
 export {
   EnrollmentError,
@@ -106,12 +106,16 @@ export {
   withdrawAcademicEnrollment,
   completeAcademicEnrollment,
   listStudentSchoolEnrollments,
+  findActiveSchoolEnrollment,
+  findActiveAcademicEnrollment,
   listAcademicEnrollmentHistory,
   listActiveStudentSchoolIds,
   listActiveGuardianSchoolIds,
   listSchoolStudentIds,
   listSchoolGuardianIds,
 } from './enrollment.js';
+export { beginStudentImportBatch, completeStudentImportBatch, StudentImportBatchError } from './student-import.js';
+export type { StudentImportScope, StudentImportCounts } from './student-import.js';
 export type {
   EnrollmentScope,
   EnrollmentAudit,

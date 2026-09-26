@@ -7,6 +7,8 @@ import { EnrollmentService } from './enrollment.service.js';
 import { EnrollmentController } from './enrollment.controller.js';
 import { GuardianDirectoryController, StudentGuardianRelationshipController } from './guardian-directory.controller.js';
 import { StudentDirectoryController } from './student-directory.controller.js';
+import { StudentImportService } from './student-import.service.js';
+import { StudentImportController } from './student-import.controller.js';
 
 @Module({
   imports: [AuthModule, AuthorizationModule, PeopleModule, AcademicsModule],
@@ -15,8 +17,9 @@ import { StudentDirectoryController } from './student-directory.controller.js';
     GuardianDirectoryController,
     StudentGuardianRelationshipController,
     EnrollmentController,
+    StudentImportController,
   ],
-  providers: [EnrollmentService],
-  exports: [EnrollmentService],
+  providers: [EnrollmentService, StudentImportService],
+  exports: [EnrollmentService, StudentImportService],
 })
 export class EnrollmentModule {}
