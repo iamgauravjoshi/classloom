@@ -120,6 +120,16 @@ describe.skipIf(!enabled)('staff directory persistence', () => {
     const linked = await withTenantContext(runtime.db, tenantId, (tx) => linkStaffMembership(tx, scope, person.id, actorMembershipId, { actorAccountId }));
     expect(linked.membershipId).toBe(actorMembershipId);
     expect(await withTenantContext(runtime.db, tenantId, (tx) => isAssignableTeacher(tx, scope, actorMembershipId))).toBe(true);
+    await admin`update accounts set status = 'disabled' where normalized_email = ${actorEmail}`;
+    expect(await withTenantContext(runtime.db, tenantId, (tx) => isAssignableTeacher(tx, scope, actorMembershipId))).toBe(false);
+    await admin`update accounts set status = 'active' where normalized_email = ${actorEmail}`;
+    await admin`update memberships set status = 'disabled' where id = ${actorMembershipId}`;
+    expect(await withTenantContext(runtime.db, tenantId, (tx) => isAssignableTeacher(tx, scope, actorMembershipId))).toBe(false);
+    await admin`update memberships set status = 'active' where id = ${actorMembershipId}`;
+    const [grant] = await admin<{ id: string }[]>`delete from membership_role_assignments where tenant_id = ${tenantId} and membership_id = ${actorMembershipId} returning role_id as id`;
+    expect(await withTenantContext(runtime.db, tenantId, (tx) => isAssignableTeacher(tx, scope, actorMembershipId))).toBe(false);
+    await admin`insert into membership_role_assignments (tenant_id, membership_id, role_id, scope_kind) values (${tenantId}, ${actorMembershipId}, ${grant!.id}, 'tenant')`;
+    expect(await withTenantContext(runtime.db, tenantId, (tx) => isAssignableTeacher(tx, scope, actorMembershipId))).toBe(true);
     await withTenantContext(runtime.db, tenantId, (tx) => addStaffAffiliation(tx, scope, secondSchoolId, person.id, { designation: 'Visiting Teacher', kind: 'teacher' }, { actorAccountId }));
     expect(await withTenantContext(runtime.db, tenantId, (tx) => isAssignableTeacher(tx, { tenantId, schoolId: secondSchoolId }, actorMembershipId))).toBe(true);
     await withTenantContext(runtime.db, tenantId, (tx) => updateStaffAffiliation(tx, scope, person.id, { status: 'inactive' }, { actorAccountId }));

@@ -1,5 +1,5 @@
 import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
-import { isAssignableTeacher, type StaffScope, type TenantTransaction } from '@classloom/db';
+import { isAssignableTeacher, listAssignableTeacherAccounts, type StaffScope, type TenantTransaction } from '@classloom/db';
 import { AuthorizationService } from '../authorization/authorization.service.js';
 
 export type PeopleActor = { tenantId: string; accountId: string; membershipId: string; requestId?: string };
@@ -36,5 +36,9 @@ export class PeopleService {
 
   canAssignTeacher(tx: TenantTransaction, scope: StaffScope, membershipId: string): Promise<boolean> {
     return isAssignableTeacher(tx, scope, membershipId);
+  }
+
+  listAssignableTeachers(tx: TenantTransaction, scope: StaffScope) {
+    return listAssignableTeacherAccounts(tx, scope);
   }
 }

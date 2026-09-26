@@ -389,3 +389,26 @@ export async function isAssignableTeacher(tx: TenantTransaction, scope: StaffSco
     )).limit(1);
   return Boolean(record) && await activeMemberAtSchool(tx, scope, membershipId);
 }
+
+export async function listAssignableTeacherAccounts(tx: TenantTransaction, scope: StaffScope) {
+  return tx.selectDistinct({
+    id: memberships.id,
+    email: accounts.normalizedEmail,
+    displayName: sql<string>`concat_ws(' ', coalesce(${staffProfiles.preferredName}, ${staffProfiles.givenName}), ${staffProfiles.familyName})`,
+  }).from(staffProfiles)
+    .innerJoin(staffSchoolAffiliations, and(
+      eq(staffSchoolAffiliations.tenantId, staffProfiles.tenantId), eq(staffSchoolAffiliations.staffId, staffProfiles.id),
+    ))
+    .innerJoin(teacherProfiles, and(eq(teacherProfiles.tenantId, staffProfiles.tenantId), eq(teacherProfiles.staffId, staffProfiles.id)))
+    .innerJoin(memberships, and(eq(memberships.tenantId, staffProfiles.tenantId), eq(memberships.id, staffProfiles.membershipId)))
+    .innerJoin(accounts, eq(accounts.id, memberships.accountId))
+    .innerJoin(membershipRoleAssignments, and(
+      eq(membershipRoleAssignments.tenantId, memberships.tenantId), eq(membershipRoleAssignments.membershipId, memberships.id),
+    ))
+    .where(and(
+      eq(staffProfiles.tenantId, scope.tenantId), eq(staffSchoolAffiliations.schoolId, scope.schoolId),
+      eq(staffSchoolAffiliations.status, 'active'), eq(staffSchoolAffiliations.kind, 'teacher'),
+      eq(memberships.status, 'active'), eq(accounts.status, 'active'),
+      or(eq(membershipRoleAssignments.scopeKind, 'tenant'), eq(membershipRoleAssignments.schoolId, scope.schoolId)),
+    )).orderBy(accounts.normalizedEmail);
+}
