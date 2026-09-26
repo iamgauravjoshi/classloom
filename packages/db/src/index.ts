@@ -23,8 +23,21 @@ export {
   schools,
   securityEvents,
   sessions,
+  staffProfiles,
+  staffSchoolAffiliations,
+  teacherProfiles,
   tenants,
 } from './schema.js';
+export {
+  StaffError,
+  normalizeStaffCode,
+  normalizeStaffProfile,
+  normalizeStaffListFilters,
+  createStaffProfile,
+  listSchoolStaff,
+  readSchoolStaff,
+} from './staff.js';
+export type { StaffScope, StaffProfileInput, StaffAffiliationInput, StaffCreateInput, StaffListFilters, StaffListPage, StaffRecord, StaffAudit } from './staff.js';
 export { withTenantContext } from './tenant-context.js';
 export { AcademicSetupError, validateAcademicCode, validateAcademicSession, listAcademicSchools, listActiveAcademicMembers, readAcademicSetup, createAcademicSession, createAcademicClass, createAcademicSection, createAcademicSubject, createAcademicAssignment, activateAcademicSession } from './academics.js';
 export { withAccountContext } from './account-context.js';
