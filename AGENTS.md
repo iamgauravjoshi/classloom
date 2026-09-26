@@ -23,3 +23,5 @@ Use Node.js 24.15+ and pnpm 11.19. Common root commands are `pnpm dev`, `pnpm li
 ## Style and Contributions
 
 Follow `.editorconfig` (UTF-8, LF, two spaces, final newline). Web linting uses ESLint; API linting uses Oxlint; Vitest runs tests. Use `*.spec.ts` for unit tests and `*.e2e-spec.ts` for API end-to-end tests. Commit subjects follow the observed `type: imperative summary` format (for example, `docs: update local setup`). PRs should summarize purpose and affected areas, link relevant issues or design docs, list verification run, and include screenshots for UI changes. Keep secrets out of version control; `.env.example` contains development placeholders only.
+
+Name phase branches `phase-N-descriptive-name` without a `codex/` prefix.
