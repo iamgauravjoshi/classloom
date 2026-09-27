@@ -656,7 +656,7 @@ export const admissionCases = pgTable('admission_cases', {
   foreignKey({ columns: [table.tenantId, table.createdByMembershipId], foreignColumns: [memberships.tenantId, memberships.id], name: 'admission_cases_created_by_membership_fk' }).onDelete('restrict'),
   foreignKey({ columns: [table.createdByAccountId, table.createdByMembershipId], foreignColumns: [memberships.accountId, memberships.id], name: 'admission_cases_created_by_account_membership_fk' }).onDelete('restrict'),
   foreignKey({ columns: [table.createdByAccountId], foreignColumns: [accounts.id], name: 'admission_cases_created_by_account_fk' }).onDelete('restrict'),
-  uniqueIndex('admission_cases_tenant_school_id_unique').on(table.tenantId, table.schoolId, table.id),
+  unique('admission_cases_tenant_school_id_unique').on(table.tenantId, table.schoolId, table.id),
   uniqueIndex('admission_cases_school_reference_unique').on(table.tenantId, table.schoolId, sql`upper(trim(${table.caseReference}))`),
   index('admission_cases_school_status_created_idx').on(table.tenantId, table.schoolId, table.status, table.createdAt, table.id),
   check('admission_cases_status_check', sql`${table.status} in ('enquiry', 'draft', 'submitted', 'under_review', 'accepted', 'rejected', 'withdrawn', 'admitted')`),

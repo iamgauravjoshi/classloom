@@ -38,6 +38,7 @@ describe('admissions schema', () => {
       expect(config.policies.map((policy) => policy.name)).toContain('tenant_isolation');
     }
     const caseConfig = getTableConfig(schema.admissionCases);
+    expect(caseConfig.uniqueConstraints.some((constraint) => constraint.name === 'admission_cases_tenant_school_id_unique')).toBe(true);
     expect(caseConfig.indexes.some((index) => index.config.name === 'admission_cases_school_reference_unique')).toBe(true);
     const guardianConfig = getTableConfig(schema.admissionCaseGuardians);
     expect(guardianConfig.indexes.some((index) => index.config.name === 'admission_case_guardians_case_ordinal_unique')).toBe(true);

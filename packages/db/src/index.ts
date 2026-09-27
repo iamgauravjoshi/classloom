@@ -173,3 +173,26 @@ export {
 } from './authorization-repository.js';
 export type { AuthorizationScope, AuthorizationGrant } from './authorization-repository.js';
 export { listTenantAuthorizationRoles, bootstrapTenantAdmin } from './authorization-repository.js';
+export {
+  AdmissionError,
+  nextAdmissionStatus,
+  normalizeAdmissionCaseInput,
+  createAdmissionCase,
+  getAdmissionCase,
+  listAdmissionCases,
+  updateAdmissionCase,
+  transitionAdmissionCase,
+  recordAdmissionConversion,
+  listAdmissionCaseEvents,
+} from './admissions.js';
+export type {
+  AdmissionActor,
+  AdmissionCaseInput,
+  AdmissionConversionReferences,
+  AdmissionGuardianInput,
+  AdmissionListFilters,
+  AdmissionRelationship,
+  AdmissionScope,
+  AdmissionStatus,
+  AdmissionTransitionAction,
+} from './admissions.js';

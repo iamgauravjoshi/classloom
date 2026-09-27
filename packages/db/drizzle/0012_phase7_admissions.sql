@@ -75,7 +75,8 @@ CREATE TABLE "admission_cases" (
 	"created_by_membership_id" uuid NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "admission_cases_status_check" CHECK ("admission_cases"."status" in ('enquiry', 'draft', 'submitted', 'under_review', 'accepted', 'rejected', 'withdrawn', 'admitted'))
+	CONSTRAINT "admission_cases_status_check" CHECK ("admission_cases"."status" in ('enquiry', 'draft', 'submitted', 'under_review', 'accepted', 'rejected', 'withdrawn', 'admitted')),
+	CONSTRAINT "admission_cases_tenant_school_id_unique" UNIQUE("tenant_id","school_id","id")
 );
 --> statement-breakpoint
 ALTER TABLE "admission_cases" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
@@ -97,7 +98,6 @@ CREATE UNIQUE INDEX "admission_case_events_tenant_school_id_unique" ON "admissio
 CREATE INDEX "admission_case_events_case_created_idx" ON "admission_case_events" USING btree ("tenant_id","school_id","case_id","created_at","id");--> statement-breakpoint
 CREATE UNIQUE INDEX "admission_case_guardians_tenant_school_id_unique" ON "admission_case_guardians" USING btree ("tenant_id","school_id","id");--> statement-breakpoint
 CREATE UNIQUE INDEX "admission_case_guardians_case_ordinal_unique" ON "admission_case_guardians" USING btree ("tenant_id","school_id","case_id","ordinal");--> statement-breakpoint
-CREATE UNIQUE INDEX "admission_cases_tenant_school_id_unique" ON "admission_cases" USING btree ("tenant_id","school_id","id");--> statement-breakpoint
 CREATE UNIQUE INDEX "admission_cases_school_reference_unique" ON "admission_cases" USING btree ("tenant_id","school_id",upper(trim("case_reference")));--> statement-breakpoint
 CREATE INDEX "admission_cases_school_status_created_idx" ON "admission_cases" USING btree ("tenant_id","school_id","status","created_at","id");--> statement-breakpoint
 CREATE POLICY "tenant_isolation" ON "admission_case_events" AS PERMISSIVE FOR ALL TO public USING ("admission_case_events"."tenant_id" = nullif(current_setting('app.tenant_id', true), '')::uuid) WITH CHECK ("admission_case_events"."tenant_id" = nullif(current_setting('app.tenant_id', true), '')::uuid);--> statement-breakpoint
@@ -110,7 +110,9 @@ ALTER TABLE "admission_case_guardians" FORCE ROW LEVEL SECURITY;
 --> statement-breakpoint
 ALTER TABLE "admission_case_events" FORCE ROW LEVEL SECURITY;
 --> statement-breakpoint
-GRANT SELECT, INSERT, UPDATE ON TABLE admission_cases, admission_case_guardians TO classloom_runtime;
+GRANT SELECT, INSERT, UPDATE ON TABLE admission_cases TO classloom_runtime;
+--> statement-breakpoint
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE admission_case_guardians TO classloom_runtime;
 --> statement-breakpoint
 GRANT SELECT, INSERT ON TABLE admission_case_events TO classloom_runtime;
 --> statement-breakpoint

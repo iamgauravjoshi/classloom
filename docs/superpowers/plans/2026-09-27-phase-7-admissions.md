@@ -65,7 +65,7 @@
 
 **Interfaces:**
 - `AdmissionScope = { tenantId: string; schoolId: string }`.
-- `AdmissionActor = { accountId: string; membershipId: string; requestId?: string }`; `AdmissionTransitionAction = 'submit' | 'start_review' | 'return_to_draft' | 'accept' | 'reject' | 'withdraw'`.
+- `AdmissionActor = { accountId: string; membershipId: string; requestId?: string }`; `AdmissionTransitionAction = 'draft' | 'submit' | 'start_review' | 'return_to_draft' | 'accept' | 'reject' | 'withdraw'`.
 - `createAdmissionCase(tx, scope, input, actor)` creates `enquiry` or `draft`, up to 10 guardian application rows, and its initial event.
 - `getAdmissionCase(tx, scope, caseId)` returns one case with its guardian application rows; `listAdmissionCases(tx, scope, filters)` returns paged worklist rows; filters support bounded `q`, status, `requestedSessionId`, `createdFrom`, `createdTo`, cursor, and limit.
 - `updateAdmissionCase(tx, scope, caseId, input, actor)` edits applicant/application and guardian fields only in `enquiry` or `draft`.
@@ -102,7 +102,7 @@
 - [ ] **Step 1: Write failing service tests** for school permission checks, valid and invalid transitions, bounded decision notes, explicit existing-student link behavior, conversion input validation, and duplicate/stale conversion handling.
 - [ ] **Step 2: Run** `pnpm --filter @classloom/api exec vitest run src/admissions/admissions.service.spec.ts` and confirm expected failures.
 - [ ] **Step 3: Implement AdmissionsService and Enrollment contract**; maintain existing direct admission behavior and require `admissions.convert` for the dedicated contract.
-- [ ] **Step 4: Add the controller/module and register AdmissionsModule**; implement bounded cursor/search/status/session/date filters and each lifecycle endpoint from the spec; map domain errors to the existing validation/conflict/not-found envelope.
+- [ ] **Step 4: Add the controller/module and register AdmissionsModule**; implement bounded cursor/search/status/session/date filters, including the explicit enquiry-to-draft route, and each lifecycle endpoint from the spec; map domain errors to the existing validation/conflict/not-found envelope.
 - [ ] **Step 5: Run** `pnpm --filter @classloom/api exec vitest run src/admissions/admissions.service.spec.ts src/enrollment/enrollment.service.spec.ts` and confirm service/direct-admission tests pass.
 - [ ] **Step 6: Add E2E tests** for no session, wrong school/tenant, read-only role, Admission Officer lifecycle and conversion access, no broad permissions, all transitions, complete successful conversion, failure rollback, retry/concurrent conversion, and field-specific errors.
 - [ ] **Step 7: Run** `pnpm exec dotenv -e .env -- pnpm --filter @classloom/api test:e2e -- admissions.e2e-spec.ts` and confirm the E2E suite passes.

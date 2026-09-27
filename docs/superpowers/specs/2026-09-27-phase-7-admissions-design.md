@@ -75,6 +75,7 @@ Use versioned school-scoped routes:
 - `GET /api/v1/admissions/schools` — list only schools where the active membership has admissions read, manage, or convert access, including `canReadAdmissions`, `canManageAdmissions`, and `canConvertAdmissions` flags for UI choices.
 - `GET|POST /api/v1/admissions/schools/:schoolId/cases` — bounded cursor-paginated worklist and create an enquiry or draft.
 - `GET|PATCH /api/v1/admissions/schools/:schoolId/cases/:caseId` — read details; edit applicant/application fields only while editable under lifecycle rules.
+- `POST /api/v1/admissions/schools/:schoolId/cases/:caseId/draft` — move an enquiry into draft after staff begins its application; status is never patched directly.
 - `POST /api/v1/admissions/schools/:schoolId/cases/:caseId/submit` — validate required applicant and requested placement data, then submit.
 - `POST /api/v1/admissions/schools/:schoolId/cases/:caseId/review` — start or resume review, or return an under-review case to draft with a reason.
 - `POST /api/v1/admissions/schools/:schoolId/cases/:caseId/decision` — accept or reject with a required decision note.

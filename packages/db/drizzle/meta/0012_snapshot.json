@@ -1,5 +1,5 @@
 {
-  "id": "0a2eabbc-2489-4758-9f3e-3579ae511b6e",
+  "id": "1debea1f-87b8-40af-83ee-cd9b0b6a2bc0",
   "prevId": "c9e5c63d-3f94-491d-b5ae-76553b7187ef",
   "version": "7",
   "dialect": "postgresql",
@@ -1665,33 +1665,6 @@
         }
       },
       "indexes": {
-        "admission_cases_tenant_school_id_unique": {
-          "name": "admission_cases_tenant_school_id_unique",
-          "columns": [
-            {
-              "expression": "tenant_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "school_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "admission_cases_school_reference_unique": {
           "name": "admission_cases_school_reference_unique",
           "columns": [
@@ -1884,7 +1857,17 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "admission_cases_tenant_school_id_unique": {
+          "name": "admission_cases_tenant_school_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "tenant_id",
+            "school_id",
+            "id"
+          ]
+        }
+      },
       "policies": {
         "tenant_isolation": {
           "name": "tenant_isolation",
