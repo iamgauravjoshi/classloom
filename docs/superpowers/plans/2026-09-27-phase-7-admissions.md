@@ -106,7 +106,7 @@
 - [x] **Step 5: Run** `pnpm --filter @classloom/api exec vitest run src/admissions/admissions.service.spec.ts src/enrollment/enrollment.service.spec.ts` and confirm service/direct-admission tests pass.
 - [x] **Step 6: Add E2E tests** for no session, wrong school/tenant, read-only role, Admission Officer lifecycle and conversion access, no broad permissions, all transitions, complete successful conversion, failure rollback, retry/concurrent conversion, and field-specific errors.
 - [x] **Step 7: Run** `pnpm exec dotenv -e .env -- pnpm --filter @classloom/api test:e2e -- admissions.e2e-spec.ts` and confirm the E2E suite passes.
-- [ ] **Step 8: Commit** as `feat: add admissions API workflow`.
+- [x] **Step 8: Commit** as `feat: add admissions API workflow`.
 
 ### Task 4: Same-origin web API and Admissions screens
 
@@ -132,14 +132,14 @@
 - Same-origin proxy allowlists only the admissions routes and methods in the spec; it forwards cookies, origin/referer, CSRF marker, content type, and query string, with bounded JSON request bodies.
 - Protected server pages follow existing cookie/session redirects. Client components own search, filter, forms, transitions, event timeline, and conversion dialog.
 
-- [ ] **Step 1: Write failing proxy and API-helper tests** for allowlisted routes, rejected arbitrary paths, query encoding, credentials/CSRF headers, and useful API error details.
-- [ ] **Step 2: Run** `pnpm --filter @classloom/web exec vitest run src/app/api/admissions/'[...path]'/route.test.ts src/lib/admissions-api.test.ts` and confirm the new behavior fails.
-- [ ] **Step 3: Implement proxy and typed API helpers** using established same-origin patterns; run the tests and confirm they pass.
-- [ ] **Step 4: Write failing UI tests** for worklist filters, no-access/empty/loading/errors, create enquiry/draft, case event history, transition controls, conversion confirmation, field validation, and stale/conflict responses.
-- [ ] **Step 5: Implement `/admissions`, `/admissions/new`, and `/admissions/[caseId]`** using installed shadcn Base UI components, existing semantic tokens, and `DESIGN.md`; add an active Admissions navigation item in the school-management section.
-- [ ] **Step 6: Run** `pnpm --filter @classloom/web exec vitest run src/app/admissions src/lib/admissions-api.test.ts src/app/api/admissions/'[...path]'/route.test.ts` and confirm web tests pass.
-- [ ] **Step 7: Run** `pnpm --filter @classloom/web lint` and `pnpm --filter @classloom/web typecheck`; resolve diagnostics before committing.
-- [ ] **Step 8: Commit** as `feat: add admissions staff interface`.
+- [x] **Step 1: Write failing proxy and API-helper tests** for allowlisted routes, rejected arbitrary paths, query encoding, credentials/CSRF headers, and useful API error details.
+- [x] **Step 2: Run** `pnpm --filter @classloom/web exec vitest run src/app/api/admissions/'[...path]'/route.test.ts src/lib/admissions-api.test.ts` and confirm the new behavior fails.
+- [x] **Step 3: Implement proxy and typed API helpers** using established same-origin patterns; run the tests and confirm they pass.
+- [x] **Step 4: Write failing UI tests** for worklist filters, no-access/empty/loading/errors, create enquiry/draft, case event history, transition controls, conversion confirmation, field validation, and stale/conflict responses.
+- [x] **Step 5: Implement `/admissions`, `/admissions/new`, and `/admissions/[caseId]`** using installed shadcn Base UI components, existing semantic tokens, and `DESIGN.md`; add an active Admissions navigation item in the school-management section.
+- [x] **Step 6: Run** `pnpm --filter @classloom/web exec vitest run src/app/admissions src/lib/admissions-api.test.ts src/app/api/admissions/'[...path]'/route.test.ts` and confirm web tests pass.
+- [x] **Step 7: Run** `pnpm --filter @classloom/web lint` and `pnpm --filter @classloom/web typecheck`; resolve diagnostics before committing.
+- [x] **Step 8: Commit** as `feat: add admissions staff interface`.
 
 ### Task 5: Product documentation and whole-phase verification
 
