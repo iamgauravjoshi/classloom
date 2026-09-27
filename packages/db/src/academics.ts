@@ -1,4 +1,4 @@
-import { and, eq, or, sql } from 'drizzle-orm';
+import { and, eq, ne, or, sql } from 'drizzle-orm';
 import type { TenantTransaction } from './client.js';
 import { accounts, academicClasses, academicSections, academicSessions, academicSubjects, academicTeacherAssignments, membershipRoleAssignments, memberships, schools } from './schema.js';
 
@@ -28,6 +28,83 @@ export function validateAcademicSession(input: AcademicSessionInput): AcademicSe
 
 type Scope = { tenantId: string; schoolId: string };
 type NamedInput = { name: string; code: string };
+
+export type EnrollmentPlacementInput = { sessionId: string; classId: string; sectionId: string };
+
+export async function resolveEnrollmentPlacement(tx: TenantTransaction, scope: Scope, input: EnrollmentPlacementInput) {
+  const [placement] = await tx.select({
+    sessionId: academicSessions.id,
+    sessionName: academicSessions.name,
+    sessionStartDate: academicSessions.startDate,
+    sessionEndDate: academicSessions.endDate,
+    sessionStatus: academicSessions.status,
+    classId: academicClasses.id,
+    className: academicClasses.name,
+    sectionId: academicSections.id,
+    sectionName: academicSections.name,
+  }).from(academicSections)
+    .innerJoin(academicClasses, and(
+      eq(academicClasses.tenantId, academicSections.tenantId),
+      eq(academicClasses.schoolId, academicSections.schoolId),
+      eq(academicClasses.sessionId, academicSections.sessionId),
+      eq(academicClasses.id, academicSections.classId),
+    ))
+    .innerJoin(academicSessions, and(
+      eq(academicSessions.tenantId, academicSections.tenantId),
+      eq(academicSessions.schoolId, academicSections.schoolId),
+      eq(academicSessions.id, academicSections.sessionId),
+    ))
+    .where(and(
+      eq(academicSections.tenantId, scope.tenantId),
+      eq(academicSections.schoolId, scope.schoolId),
+      eq(academicSections.sessionId, input.sessionId),
+      eq(academicSections.classId, input.classId),
+      eq(academicSections.id, input.sectionId),
+      ne(academicSessions.status, 'archived'),
+    )).limit(1);
+  if (!placement) {
+    throw new AcademicSetupError('NOT_FOUND', 'Choose a class and section from a draft or active academic session');
+  }
+  return placement;
+}
+
+export async function resolveEnrollmentPlacementByCodes(
+  tx: TenantTransaction,
+  scope: Scope,
+  input: { sessionCode: string; classCode: string; sectionCode: string },
+) {
+  const sessionCode = validateAcademicCode(input.sessionCode);
+  const classCode = validateAcademicCode(input.classCode);
+  const sectionCode = validateAcademicCode(input.sectionCode);
+  const [placement] = await tx.select({
+    sessionId: academicSessions.id,
+    sessionName: academicSessions.name,
+    sessionStartDate: academicSessions.startDate,
+    sessionEndDate: academicSessions.endDate,
+    sessionStatus: academicSessions.status,
+    classId: academicClasses.id,
+    className: academicClasses.name,
+    sectionId: academicSections.id,
+    sectionName: academicSections.name,
+  }).from(academicSections)
+    .innerJoin(academicClasses, and(
+      eq(academicClasses.tenantId, academicSections.tenantId), eq(academicClasses.schoolId, academicSections.schoolId),
+      eq(academicClasses.sessionId, academicSections.sessionId), eq(academicClasses.id, academicSections.classId),
+    ))
+    .innerJoin(academicSessions, and(
+      eq(academicSessions.tenantId, academicSections.tenantId), eq(academicSessions.schoolId, academicSections.schoolId),
+      eq(academicSessions.id, academicSections.sessionId),
+    ))
+    .where(and(
+      eq(academicSections.tenantId, scope.tenantId), eq(academicSections.schoolId, scope.schoolId),
+      sql`upper(trim(${academicSessions.code})) = ${sessionCode}`,
+      sql`upper(trim(${academicClasses.code})) = ${classCode}`,
+      sql`upper(trim(${academicSections.code})) = ${sectionCode}`,
+      ne(academicSessions.status, 'archived'),
+    )).limit(1);
+  if (!placement) throw new AcademicSetupError('NOT_FOUND', 'CSV academic session, class, or section was not found or is archived');
+  return placement;
+}
 
 function normalizedName(value: string): string {
   const name = value.trim();

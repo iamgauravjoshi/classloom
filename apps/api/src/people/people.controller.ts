@@ -3,6 +3,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
 import {
   addStaffAffiliation, createStaffProfile, linkStaffMembership, listEligibleStaffAccounts,
+  listEligibleGuardianAccounts, listEligibleStudentAccounts,
   listSchoolStaff, listStaffAffiliationSchoolIds, listStaffSchools, readSchoolStaff,
   StaffError, unlinkStaffMembership, updateStaffAffiliation, updateStaffProfile,
   upsertTeacherProfile, withTenantContext, type TenantTransaction,
@@ -13,6 +14,8 @@ import { CsrfGuard } from '../auth/csrf.guard.js';
 import { parseRequest } from '../common/request-validation.js';
 import { DatabaseService } from '../database/database.service.js';
 import { PeopleService, type PeopleActor } from './people.service.js';
+import { StudentPeopleService } from './student-people.service.js';
+import { AuthorizationService } from '../authorization/authorization.service.js';
 
 const uuid = z.string().uuid();
 const optionalText = (maximum: number) => z.string().trim().max(maximum).nullable().optional();
@@ -58,14 +61,25 @@ function mapStaffError(error: unknown): never {
 @Controller('people')
 @UseGuards(AuthGuard)
 export class PeopleSchoolsController {
-  constructor(@Inject(DatabaseService) private readonly database: DatabaseService, @Inject(PeopleService) private readonly people: PeopleService) {}
+  constructor(
+    @Inject(DatabaseService) private readonly database: DatabaseService,
+    @Inject(PeopleService) private readonly people: PeopleService,
+    @Inject(AuthorizationService) private readonly authorization: AuthorizationService,
+  ) {}
 
   @Get('schools')
   async schools(@Req() request: AuthenticatedRequest) {
     const actor = actorFrom(request);
     const candidates = await withTenantContext(this.database.db, actor.tenantId, (tx) => listStaffSchools(tx, actor.tenantId));
-    const allowed = await Promise.all(candidates.map(async (school) => ({ school, allowed: await this.people.canReadSchool(actor, school.id) })));
-    return Promise.all(allowed.filter((item) => item.allowed).map(async ({ school }) => ({ ...school, canManageStaff: await this.people.canManageSchool(actor, school.id) })));
+    const schools = await Promise.all(candidates.map(async (school) => {
+      const [canReadStaff, canManageStaff, canReadStudents, canManageStudents, canReadGuardians, canManageGuardians, canManageEnrollment] = await Promise.all([
+        this.people.canReadSchool(actor, school.id), this.people.canManageSchool(actor, school.id),
+        ...(['student.read', 'student.manage', 'guardian.read', 'guardian.manage', 'enrollment.manage'] as const)
+          .map((permission) => this.authorization.hasPermissions(actor, [permission], { kind: 'school', schoolId: school.id })),
+      ]);
+      return { ...school, canReadStaff, canManageStaff, canReadStudents, canManageStudents, canReadGuardians, canManageGuardians, canManageEnrollment };
+    }));
+    return schools.filter((school) => school.canReadStaff || school.canReadStudents || school.canReadGuardians);
   }
 }
 
@@ -73,7 +87,11 @@ export class PeopleSchoolsController {
 @Controller('people/schools/:schoolId')
 @UseGuards(AuthGuard, CsrfGuard)
 export class PeopleController {
-  constructor(@Inject(DatabaseService) private readonly database: DatabaseService, @Inject(PeopleService) private readonly people: PeopleService) {}
+  constructor(
+    @Inject(DatabaseService) private readonly database: DatabaseService,
+    @Inject(PeopleService) private readonly people: PeopleService,
+    @Inject(StudentPeopleService) private readonly studentPeople: StudentPeopleService,
+  ) {}
 
   private async detail(tx: TenantTransaction, actor: PeopleActor, schoolId: string, staffId: string) {
     const record = await readSchoolStaff(tx, { tenantId: actor.tenantId, schoolId }, staffId);
@@ -110,11 +128,18 @@ export class PeopleController {
   }
 
   @Get('eligible-accounts')
-  async accounts(@Req() request: AuthenticatedRequest, @Param('schoolId') schoolIdValue: string) {
+  async accounts(@Req() request: AuthenticatedRequest, @Param('schoolId') schoolIdValue: string, @Query('profileType') profileTypeValue?: string) {
     const actor = actorFrom(request);
     const schoolId = parseRequest(uuid, schoolIdValue);
-    await this.people.requireSchoolManage(actor, schoolId);
-    return withTenantContext(this.database.db, actor.tenantId, (tx) => listEligibleStaffAccounts(tx, { tenantId: actor.tenantId, schoolId }));
+    const profileType = profileTypeValue ? parseRequest(z.enum(['staff', 'student', 'guardian']), profileTypeValue) : 'staff';
+    if (profileType === 'staff') await this.people.requireSchoolManage(actor, schoolId);
+    else if (profileType === 'student') await this.studentPeople.requireStudentManage(actor, schoolId);
+    else await this.studentPeople.requireGuardianManage(actor, schoolId);
+    return withTenantContext(this.database.db, actor.tenantId, (tx) => profileType === 'staff'
+      ? listEligibleStaffAccounts(tx, { tenantId: actor.tenantId, schoolId })
+      : profileType === 'student'
+        ? listEligibleStudentAccounts(tx, actor.tenantId)
+        : listEligibleGuardianAccounts(tx, actor.tenantId));
   }
 
   @Post('staff')

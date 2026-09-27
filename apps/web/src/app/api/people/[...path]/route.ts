@@ -6,6 +6,15 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function allowed(method: string, path: string[]) {
   if (path.length === 1 && path[0] === "schools") return method === "GET";
   if (path.length < 3 || path[0] !== "schools" || !uuid.test(path[1]!)) return false;
+  if (["students", "guardians"].includes(path[2]!)) {
+    if (path.length === 3) return method === "GET" || method === "POST";
+    if (!uuid.test(path[3] ?? "")) return false;
+    if (path.length === 4) return method === "GET" || method === "PATCH";
+    if (path.length === 5 && path[4] === "account") return method === "PUT" || method === "DELETE";
+    if (path[2] === "students" && path.length === 5 && path[4] === "guardians") return method === "POST";
+    if (path[2] === "students" && path.length === 6 && path[4] === "guardians" && path[5] === "new") return method === "POST";
+    return path[2] === "students" && path.length === 6 && path[4] === "guardians" && uuid.test(path[5] ?? "") && method === "PATCH";
+  }
   if (path.length === 3) return path[2] === "staff" && (method === "GET" || method === "POST") || path[2] === "eligible-accounts" && method === "GET";
   if (path[2] !== "staff" || !uuid.test(path[3]!)) return false;
   if (path.length === 4) return method === "GET" || method === "PATCH";
@@ -46,7 +55,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     const upstream = await fetch(`${API_BASE}/people/${path.join("/")}${request.nextUrl.search}`, { method: request.method, headers, body, cache: "no-store" });
     return new Response(upstream.body, { status: upstream.status, headers: { "content-type": upstream.headers.get("content-type") ?? "application/json", "cache-control": "no-store" } });
   } catch {
-    return Response.json({ message: "Staff service is unavailable" }, { status: 503 });
+    return Response.json({ message: "People service is unavailable" }, { status: 503 });
   }
 }
 

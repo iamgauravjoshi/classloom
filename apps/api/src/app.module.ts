@@ -8,9 +8,10 @@ import { AuthModule } from './auth/auth.module.js';
 import { AuthorizationModule } from './authorization/authorization.module.js';
 import { AcademicsModule } from './academics/academics.module.js';
 import { PeopleModule } from './people/people.module.js';
+import { EnrollmentModule } from './enrollment/enrollment.module.js';
 
 @Module({
-  imports: [DatabaseModule, AuthModule, AuthorizationModule, AcademicsModule, PeopleModule],
+  imports: [DatabaseModule, AuthModule, AuthorizationModule, AcademicsModule, PeopleModule, EnrollmentModule],
   controllers: [HealthController],
   providers: [{ provide: APP_FILTER, useClass: HttpExceptionEnvelopeFilter }],
 })

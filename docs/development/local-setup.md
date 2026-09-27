@@ -11,3 +11,11 @@ pnpm db:provision-tenant -- --name "Demo School Group" --slug demo-school-group 
 ```
 
 The slug must be unique across tenants; use a different slug if you provision more than once. The provisioning URL is for trusted server-side bootstrap only and must not be exposed to a browser. `docker compose down` stops local services without removing the database volume; remove volumes only when you deliberately want a clean local database.
+
+For Phase 6, first create an academic session, class, and section in `/academic-setup`. Then use `/students` to admit a student or import a CSV, and `/guardians` to inspect linked contacts. To seed synthetic development records into an existing tenant and school, run:
+
+```powershell
+pnpm db:seed-phase6-demo -- --tenant demo-school-group --school DEMO --seed 2606
+```
+
+Substitute the slug or tenant ID and school code or school ID from your own local database. The command refuses `NODE_ENV=production`, requires an existing active administrator membership for audit, creates records with reserved `DEMO-` codes, and skips those records when rerun. It does not create accounts, passwords, or invitations. See [the Phase 6 workflow](students-guardians-enrollment.md) for CSV limits and mapping.

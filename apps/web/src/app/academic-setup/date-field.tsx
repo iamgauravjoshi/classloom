@@ -16,6 +16,7 @@ export function DateField({
   onChange,
   error,
   earliestDate,
+  yearDropdown = false,
   required = true,
 }: {
   id: string;
@@ -24,6 +25,7 @@ export function DateField({
   onChange: (value: string) => void;
   error?: string;
   earliestDate?: string;
+  yearDropdown?: boolean;
   required?: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -51,6 +53,9 @@ export function DateField({
         <PopoverContent className="w-auto p-0" align="start">
           <Calendar
             mode="single"
+            captionLayout={yearDropdown ? "dropdown" : "label"}
+            startMonth={yearDropdown ? new Date(1900, 0, 1) : undefined}
+            endMonth={yearDropdown ? new Date() : undefined}
             selected={selected}
             defaultMonth={selected}
             disabled={earliestDate ? { before: parseDateOnly(earliestDate) } : undefined}

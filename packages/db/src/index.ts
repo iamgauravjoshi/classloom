@@ -25,6 +25,12 @@ export {
   sessions,
   staffProfiles,
   staffSchoolAffiliations,
+  studentAcademicEnrollments,
+  studentGuardianRelationships,
+  studentImportBatches,
+  studentProfiles,
+  studentSchoolEnrollments,
+  guardianProfiles,
   teacherProfiles,
   tenants,
 } from './schema.js';
@@ -49,8 +55,79 @@ export {
   listAssignableTeacherAccounts,
 } from './staff.js';
 export type { StaffScope, StaffProfileInput, StaffAffiliationInput, StaffCreateInput, StaffListFilters, StaffListPage, StaffRecord, StaffAudit } from './staff.js';
+export {
+  StudentPeopleError,
+  normalizeStudentCode,
+  normalizeStudentProfile,
+  normalizeGuardianProfile,
+  normalizeGuardianRelationship,
+  findStudentByCode,
+  createStudentProfile,
+  readStudentProfile,
+  listStudentProfilesByIds,
+  updateStudentProfile,
+  setStudentStatus,
+  findGuardianByCode,
+  createGuardianProfile,
+  readGuardianProfile,
+  listGuardianProfilesByIds,
+  updateGuardianProfile,
+  setGuardianStatus,
+  createOrUpdateGuardianRelationship,
+  updateGuardianRelationship,
+  listStudentGuardians,
+  findStudentGuardianRelationship,
+  lockStudentForScope,
+  lockGuardianForScope,
+  lockActiveStudentGuardiansForScope,
+  listGuardianStudents,
+  linkStudentMembership,
+  unlinkStudentMembership,
+  linkGuardianMembership,
+  unlinkGuardianMembership,
+  listEligibleStudentAccounts,
+  listEligibleGuardianAccounts,
+} from './students.js';
+export type {
+  StudentScope,
+  StudentPeopleAudit,
+  StudentProfileInput,
+  GuardianProfileInput,
+  GuardianRelationshipInput,
+  GuardianRelationshipType,
+} from './students.js';
 export { withTenantContext } from './tenant-context.js';
-export { AcademicSetupError, validateAcademicCode, validateAcademicSession, listAcademicSchools, listActiveAcademicMembers, readAcademicSetup, createAcademicSession, createAcademicClass, createAcademicSection, createAcademicSubject, createAcademicAssignment, activateAcademicSession } from './academics.js';
+export { AcademicSetupError, validateAcademicCode, validateAcademicSession, resolveEnrollmentPlacement, resolveEnrollmentPlacementByCodes, listAcademicSchools, listActiveAcademicMembers, readAcademicSetup, createAcademicSession, createAcademicClass, createAcademicSection, createAcademicSubject, createAcademicAssignment, activateAcademicSession } from './academics.js';
+export type { EnrollmentPlacementInput } from './academics.js';
+export {
+  EnrollmentError,
+  normalizeSchoolEnrollmentInput,
+  normalizeAcademicEnrollmentInput,
+  requireActiveEnrollment,
+  createSchoolEnrollment,
+  createAcademicEnrollment,
+  transferAcademicEnrollment,
+  withdrawAcademicEnrollment,
+  completeAcademicEnrollment,
+  listStudentSchoolEnrollments,
+  findActiveSchoolEnrollment,
+  findActiveAcademicEnrollment,
+  listAcademicEnrollmentHistory,
+  listActiveStudentSchoolIds,
+  listActiveGuardianSchoolIds,
+  listSchoolStudentIds,
+  listSchoolGuardianIds,
+} from './enrollment.js';
+export { beginStudentImportBatch, completeStudentImportBatch, StudentImportBatchError } from './student-import.js';
+export type { StudentImportScope, StudentImportCounts } from './student-import.js';
+export type {
+  EnrollmentScope,
+  EnrollmentAudit,
+  SchoolEnrollmentInput,
+  AcademicEnrollmentInput,
+  EnrollmentCloseInput,
+  EnrollmentPlacement,
+} from './enrollment.js';
 export { withAccountContext } from './account-context.js';
 export { seedTenantAuthorization } from './authorization-seeding.js';
 export { PERMISSION_CATALOG, BUILT_IN_ROLE_TEMPLATES } from './authorization-catalog.js';
