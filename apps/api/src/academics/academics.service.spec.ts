@@ -70,6 +70,6 @@ describe('AcademicsService timetable contracts', () => {
     const { service, people } = serviceWith(undefined, { canAssignTeacher: vi.fn().mockResolvedValue(false) });
     await expect(service.requireTimetableAssignment(tx, scope, 'session-1', 'section-1', 'subject-1', 'assignment-1'))
       .rejects.toMatchObject({ code: 'CONFLICT' });
-    expect(people.canAssignTeacher).toHaveBeenCalledWith(tx, scope, 'teacher-1');
+    expect(people.canAssignTeacher.mock.calls[0]).toEqual([tx, scope, 'teacher-1']);
   });
 });

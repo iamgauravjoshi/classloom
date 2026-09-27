@@ -157,7 +157,11 @@ export class TimetableService {
       const timetable = await this.persistence.lockOrCreate(tx, scope, sessionId, actor);
       const current = await this.persistence.read(tx, scope, sessionId);
       for (const slot of current.slots) {
-        const normalized = normalizeTimetableSlotInput(slot);
+        const normalized = normalizeTimetableSlotInput({
+          ...slot,
+          startTime: slot.startTime.slice(0, 5),
+          endTime: slot.endTime.slice(0, 5),
+        });
         const { teacherMembershipId } = await this.validateReferences(tx, scope, normalized);
         slot.teacherMembershipId = teacherMembershipId;
       }

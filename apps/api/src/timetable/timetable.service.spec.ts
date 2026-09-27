@@ -60,7 +60,7 @@ describe('TimetableService slot validation and lifecycle', () => {
   it('allows adjacent slots and persists an unassigned teacher slot', async () => {
     const { service, persistence, academics } = harness({ slots: [{ ...slotInput, id: 'existing', endTime: '09:00', teacherMembershipId: 'teacher-1' }], assigned: false });
     await expect(service.createSlot(actor, scope, { ...slotInput, teacherAssignmentId: null })).resolves.toMatchObject({ id: 'slot-new' });
-    expect(academics.requireTimetableAssignment).not.toHaveBeenCalled();
+    expect(academics.requireTimetableAssignment.mock.calls).toHaveLength(0);
     expect(persistence.insert).toHaveBeenCalledWith(expect.anything(), scope, timetable.id, expect.objectContaining({ teacherAssignmentId: null }), actor);
   });
 
@@ -75,6 +75,13 @@ describe('TimetableService slot validation and lifecycle', () => {
     const { service, persistence } = harness();
     await expect(service.publish(actor, scope, sessionId)).resolves.toMatchObject({ status: 'published' });
     expect(persistence.publish).toHaveBeenCalledWith(expect.anything(), scope, timetable.id, actor);
+  });
+
+  it('validates persisted PostgreSQL time values when publishing', async () => {
+    const persisted = { ...slotInput, id: 'slot-persisted', startTime: '09:00:00', endTime: '09:40:00', teacherMembershipId: 'teacher-1' };
+    const { service, persistence } = harness({ slots: [persisted] });
+    await expect(service.publish(actor, scope, sessionId)).resolves.toMatchObject({ status: 'published' });
+    expect(persistence.publish).toHaveBeenCalled();
   });
 
   it('moves edits to a published timetable back to draft before republishing', async () => {
