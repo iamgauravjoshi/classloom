@@ -65,4 +65,18 @@ describe('student CSV inspection and preview', () => {
     expect(result.errors).toEqual([expect.objectContaining({ row: 2, field: 'studentPhone', message: expect.stringMatching(/30/) })]);
     expect(result.commands[0]!.student.phone).toBe(extra);
   });
+
+  it('reports person-code, email, and country-code errors in preview with row context', () => {
+    const csv = `${header},Student Email,Guardian Email,Country Code\nS/1,Asha,Rao,2013-08-14,ADM-1,2026,G8,A,G/1,Ravi,Rao,Father,note,invalid-email,wrong-email,9X`;
+    const result = previewStudentCsv(Buffer.from(csv), {
+      ...mapping, studentEmail: 'Student Email', guardianEmail: 'Guardian Email', guardianCountryCode: 'Country Code',
+    });
+    expect(result.errors).toEqual(expect.arrayContaining([
+      expect.objectContaining({ row: 2, field: 'studentCode' }),
+      expect.objectContaining({ row: 2, field: 'guardianCode' }),
+      expect.objectContaining({ row: 2, field: 'studentEmail' }),
+      expect.objectContaining({ row: 2, field: 'guardianEmail' }),
+      expect.objectContaining({ row: 2, field: 'guardianCountryCode' }),
+    ]));
+  });
 });

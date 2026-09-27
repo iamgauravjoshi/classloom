@@ -106,6 +106,12 @@ export class StudentImportService {
         if (!existingGuardian) continue;
         const field = conflictingField(existingGuardian as unknown as Record<string, unknown>, linked.guardian, linked.providedFields, guardianFieldMap);
         if (field) preview.errors.push({ row, field: field as StudentImportPreviewError['field'], message: 'Guardian code conflicts with an existing profile' });
+        if (existingStudent && this.people) {
+          const relationship = await this.people.findRelationship(tx, actor.tenantId, existingStudent.id, existingGuardian.id);
+          if (relationship && relationship.relationshipType !== linked.relationship.relationshipType) {
+            preview.errors.push({ row, field: 'relationshipType', message: 'Guardian relationship conflicts with the existing relationship' });
+          }
+        }
       }
     }
     return preview;
@@ -176,6 +182,10 @@ export class StudentImportService {
         const guardianConflict = conflictingField(guardian as unknown as Record<string, unknown>, guardianCommand.guardian, guardianCommand.providedFields, guardianFieldMap);
         if (guardianConflict) throw new StudentImportCommitError('CONFLICT', `Guardian ${guardianCommand.guardian.guardianCode} conflicts in ${guardianConflict}`);
         guardianIds.add(guardian.id);
+        const relationship = await this.people.findRelationship(tx, actor.tenantId, student.id, guardian.id);
+        if (relationship && relationship.relationshipType !== guardianCommand.relationship.relationshipType) {
+          throw new StudentImportCommitError('CONFLICT', `Guardian ${guardianCommand.guardian.guardianCode} has a different relationship to student ${command.student.studentCode}`);
+        }
         await this.people.createOrResolveRelationship(tx, actor.tenantId, student.id, guardian.id, guardianCommand.relationship, {
           actorAccountId: actor.accountId, requestId: actor.requestId,
         });

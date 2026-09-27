@@ -8,6 +8,7 @@ import {
   listSchoolStudentIds,
   listStudentGuardians,
   listStudentProfilesByIds,
+  lockStudentForScope,
   readStudentProfile,
   setStudentStatus,
   StudentPeopleError,
@@ -71,7 +72,9 @@ export class StudentDirectoryController {
     await this.people.requireStudentRead(actor, schoolId);
     try {
       return await withTenantContext(this.database.db, actor.tenantId, async (tx) => {
-        const ids = await listSchoolStudentIds(tx, { tenantId: actor.tenantId, schoolId }, filters);
+        const ids = await listSchoolStudentIds(tx, { tenantId: actor.tenantId, schoolId }, {
+          sessionId: filters.sessionId, classId: filters.classId, sectionId: filters.sectionId,
+        });
         return listStudentProfilesByIds(tx, actor.tenantId, ids, filters);
       });
     } catch (error) { return mapStudentPeopleError(error); }
@@ -115,6 +118,7 @@ export class StudentDirectoryController {
     await this.people.requireStudentRead(actor, schoolId);
     try {
       return await withTenantContext(this.database.db, actor.tenantId, async (tx) => {
+        await lockStudentForScope(tx, actor.tenantId, studentId);
         const visibleIds = await listSchoolStudentIds(tx, { tenantId: actor.tenantId, schoolId });
         if (!visibleIds.includes(studentId)) throw new StudentPeopleError('NOT_FOUND', 'Student was not found in this school');
         await this.people.requireSharedStudentManage(actor, await listActiveStudentSchoolIds(tx, actor.tenantId, studentId));
@@ -143,6 +147,7 @@ export class StudentDirectoryController {
     await this.people.requireStudentRead(actor, schoolId);
     try {
       return await withTenantContext(this.database.db, actor.tenantId, async (tx) => {
+        await lockStudentForScope(tx, actor.tenantId, studentId);
         const visibleIds = await listSchoolStudentIds(tx, { tenantId: actor.tenantId, schoolId });
         if (!visibleIds.includes(studentId)) throw new StudentPeopleError('NOT_FOUND', 'Student was not found in this school');
         await this.people.requireSharedStudentManage(actor, await listActiveStudentSchoolIds(tx, actor.tenantId, studentId));

@@ -137,16 +137,16 @@ describe.skipIf(!enabled)('student guardian and enrollment API', () => {
       guardianCode: 'G-API-1', givenName: 'Ravi', familyName: 'Rao', phone: '+91 90000',
     });
     expect(guardian.status).toBe(201);
+    const schoolEnrollment = await request(app.getHttpServer()).post(`/api/v1/enrollment/schools/${schoolId}/students/${student.body.id}/school-enrollments`).set({ ...mutationHeaders, Cookie: adminCookie }).send({
+      admissionNumber: 'ADM-API-1', admissionDate: '2026-04-01',
+    });
+    expect(schoolEnrollment.status).toBe(201);
     const relationship = await request(app.getHttpServer()).post(`${base}/students/${student.body.id}/guardians`).set({ ...mutationHeaders, Cookie: adminCookie }).send({
       guardianId: guardian.body.id, relationshipType: 'father', primaryContact: true,
     });
     expect(relationship.status).toBe(201);
     const edited = await request(app.getHttpServer()).patch(`${base}/students/${student.body.id}/guardians/${relationship.body.id}`).set({ ...mutationHeaders, Cookie: adminCookie }).send({ emergencyContact: true });
     expect(edited.body).toMatchObject({ primaryContact: true, emergencyContact: true });
-    const schoolEnrollment = await request(app.getHttpServer()).post(`/api/v1/enrollment/schools/${schoolId}/students/${student.body.id}/school-enrollments`).set({ ...mutationHeaders, Cookie: adminCookie }).send({
-      admissionNumber: 'ADM-API-1', admissionDate: '2026-04-01',
-    });
-    expect(schoolEnrollment.status).toBe(201);
     const linked = await request(app.getHttpServer()).put(`${base}/guardians/${guardian.body.id}/account`).set({ ...mutationHeaders, Cookie: adminCookie }).send({ membershipId: adminMembershipId });
     expect(linked.status).toBe(200);
     const eligible = await request(app.getHttpServer()).get(`${base}/eligible-accounts?profileType=student`).set('Cookie', adminCookie);
@@ -158,11 +158,11 @@ describe.skipIf(!enabled)('student guardian and enrollment API', () => {
     const sibling = await request(app.getHttpServer()).post(`${base}/students`).set({ ...mutationHeaders, Cookie: adminCookie }).send({
       studentCode: 'S-API-SIB', givenName: 'Mira', familyName: 'Rao', dateOfBirth: '2015-03-10',
     });
-    await request(app.getHttpServer()).post(`${base}/students/${sibling.body.id}/guardians`).set({ ...mutationHeaders, Cookie: adminCookie }).send({
-      guardianId: guardian.body.id, relationshipType: 'father', emergencyContact: true,
-    }).expect(201);
     await request(app.getHttpServer()).post(`/api/v1/enrollment/schools/${schoolId}/students/${sibling.body.id}/school-enrollments`).set({ ...mutationHeaders, Cookie: adminCookie }).send({
       admissionNumber: 'ADM-API-SIB', admissionDate: '2026-04-01',
+    }).expect(201);
+    await request(app.getHttpServer()).post(`${base}/students/${sibling.body.id}/guardians`).set({ ...mutationHeaders, Cookie: adminCookie }).send({
+      guardianId: guardian.body.id, relationshipType: 'father', emergencyContact: true,
     }).expect(201);
     const guardianDetail = await request(app.getHttpServer()).get(`${base}/guardians/${guardian.body.id}`).set('Cookie', schoolCookie);
     expect(guardianDetail.body.students).toHaveLength(2);
@@ -199,6 +199,9 @@ describe.skipIf(!enabled)('student guardian and enrollment API', () => {
     expect(secondPage.body.items[0].id).not.toBe(firstPage.body.items[0].id);
     const guardianList = await request(app.getHttpServer()).get(`${base}/guardians?q=Ravi`).set('Cookie', schoolCookie);
     expect(guardianList.body.items).toEqual([expect.objectContaining({ id: guardian.body.id })]);
+    await request(app.getHttpServer()).patch(`${base}/students/${student.body.id}`).set({ ...mutationHeaders, Cookie: adminCookie }).send({ status: 'inactive' }).expect(200);
+    const inactiveStudents = await request(app.getHttpServer()).get(`${base}/students?status=inactive`).set('Cookie', schoolCookie);
+    expect(inactiveStudents.body.items).toEqual(expect.arrayContaining([expect.objectContaining({ id: student.body.id, status: 'inactive' })]));
   });
 
   it('runs initial placement, transfer, withdrawal, and returns readable conflicts', async () => {
@@ -222,12 +225,22 @@ describe.skipIf(!enabled)('student guardian and enrollment API', () => {
       sessionId, classId, sectionId: sectionTwoId, rollNumber: 'API-02-B', effectiveDate: '2026-08-01', reason: 'Section change',
     });
     expect(transferred.body).toMatchObject({ status: 'active', sectionId: sectionTwoId });
+    const contact = await request(app.getHttpServer()).post(`${peopleBase}/guardians`).set({ ...mutationHeaders, Cookie: adminCookie }).send({
+      guardianCode: 'G-API-WITHDRAW', givenName: 'Mira', familyName: 'Singh',
+    }).expect(201);
+    const relationship = await request(app.getHttpServer()).post(`${peopleBase}/students/${student.body.id}/guardians`).set({ ...mutationHeaders, Cookie: adminCookie }).send({
+      guardianId: contact.body.id, relationshipType: 'mother', primaryContact: true,
+    }).expect(201);
     const withdrawn = await request(app.getHttpServer()).post(`/api/v1/enrollment/schools/${schoolId}/academic-enrollments/${transferred.body.id}/withdraw`).set({ ...mutationHeaders, Cookie: adminCookie }).send({
       effectiveDate: '2026-09-01', reason: 'Moved',
     });
     expect(withdrawn.body.status).toBe('withdrawn');
     const history = await request(app.getHttpServer()).get(`/api/v1/enrollment/schools/${schoolId}/school-enrollments/${schoolEnrollment.body.id}/academic-enrollments`).set('Cookie', schoolCookie);
     expect(history.body).toHaveLength(2);
+    await request(app.getHttpServer()).patch(`${peopleBase}/students/${student.body.id}/guardians/${relationship.body.id}`).set({ ...mutationHeaders, Cookie: adminCookie }).send({ primaryContact: false }).expect(404);
+    await request(app.getHttpServer()).post(`${peopleBase}/students/${student.body.id}/guardians`).set({ ...mutationHeaders, Cookie: adminCookie }).send({
+      guardianId: contact.body.id, relationshipType: 'mother', primaryContact: false,
+    }).expect(404);
 
     const completedStudent = await request(app.getHttpServer()).post(`${peopleBase}/students`).set({ ...mutationHeaders, Cookie: adminCookie }).send({
       studentCode: 'S-API-COMPLETE', givenName: 'Nila', familyName: 'Shah', dateOfBirth: '2012-01-01',

@@ -116,4 +116,20 @@ describe.skipIf(!enabled)('student CSV import API', () => {
     expect(students!.count).toBe(0);
     expect(guardians!.count).toBe(0);
   });
+
+  it('preserves an existing guardian relationship when compatible CSV rows are imported again', async () => {
+    const csv = `${csvHeader}\nIMP-FLAGS,Asha,Shah,2013-08-14,ADM-IMP-FLAGS,2026,G8,A,G-IMP-FLAGS,Ravi,Shah,Father`;
+    await upload('commit', csv, randomUUID()).expect(201);
+    await admin`update student_guardian_relationships set primary_contact = true, emergency_contact = true, authorized_pickup = true, financial_responsibility = true, portal_access = true, status = 'inactive'
+      where tenant_id = ${tenantId} and student_id = (select id from student_profiles where tenant_id = ${tenantId} and student_code = 'IMP-FLAGS')`;
+    await upload('commit', csv, randomUUID()).expect(201);
+    const [relationship] = await admin<{ primary_contact: boolean; emergency_contact: boolean; authorized_pickup: boolean; financial_responsibility: boolean; portal_access: boolean; status: string }[]>`
+      select primary_contact, emergency_contact, authorized_pickup, financial_responsibility, portal_access, status
+      from student_guardian_relationships where tenant_id = ${tenantId} and student_id = (select id from student_profiles where tenant_id = ${tenantId} and student_code = 'IMP-FLAGS')`;
+    expect(relationship).toMatchObject({ primary_contact: true, emergency_contact: true, authorized_pickup: true, financial_responsibility: true, portal_access: true, status: 'inactive' });
+    const changedType = csv.replace('Father', 'Mother');
+    const preview = await upload('preview', changedType);
+    expect(preview.body.errors).toEqual(expect.arrayContaining([expect.objectContaining({ row: 2, field: 'relationshipType' })]));
+    await upload('commit', changedType, randomUUID()).expect(409);
+  });
 });

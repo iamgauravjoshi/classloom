@@ -10,6 +10,8 @@ import {
   listSchoolStudentIds,
   listGuardianProfilesByIds,
   listGuardianStudents,
+  lockGuardianForScope,
+  lockStudentForScope,
   listSchoolGuardianIds,
   readGuardianProfile,
   setGuardianStatus,
@@ -104,6 +106,7 @@ export class GuardianDirectoryController {
     const input = parseRequest(patchInput, body);
     await this.people.requireGuardianRead(actor, schoolId);
     try { return await withTenantContext(this.database.db, actor.tenantId, async (tx) => {
+      await lockGuardianForScope(tx, actor.tenantId, guardianId);
       if (!(await listSchoolGuardianIds(tx, { tenantId: actor.tenantId, schoolId })).includes(guardianId)) throw new StudentPeopleError('NOT_FOUND', 'Guardian was not found in this school');
       await this.people.requireSharedGuardianManage(actor, await listActiveGuardianSchoolIds(tx, actor.tenantId, guardianId));
       const { status, ...profile } = input;
@@ -129,6 +132,7 @@ export class GuardianDirectoryController {
     const guardianId = parseRequest(uuid, guardianIdValue);
     await this.people.requireGuardianRead(actor, schoolId);
     try { return await withTenantContext(this.database.db, actor.tenantId, async (tx) => {
+      await lockGuardianForScope(tx, actor.tenantId, guardianId);
       if (!(await listSchoolGuardianIds(tx, { tenantId: actor.tenantId, schoolId })).includes(guardianId)) throw new StudentPeopleError('NOT_FOUND', 'Guardian was not found in this school');
       await this.people.requireSharedGuardianManage(actor, await listActiveGuardianSchoolIds(tx, actor.tenantId, guardianId));
       const audit = { actorAccountId: actor.accountId, requestId: actor.requestId };
@@ -151,6 +155,7 @@ export class StudentGuardianRelationshipController {
     const input = parseRequest(newGuardianRelationshipInput, body);
     await Promise.all([this.people.requireStudentManage(actor, schoolId), this.people.requireGuardianManage(actor, schoolId)]);
     try { return await withTenantContext(this.database.db, actor.tenantId, async (tx) => {
+      await lockStudentForScope(tx, actor.tenantId, studentId);
       if (!(await listActiveStudentSchoolIds(tx, actor.tenantId, studentId)).includes(schoolId)) throw new StudentPeopleError('NOT_FOUND', 'Student has no active enrollment in this school');
       const audit = { actorAccountId: actor.accountId, requestId: actor.requestId };
       const guardian = await this.people.createOrResolveGuardian(tx, actor.tenantId, input.guardian, audit);
@@ -167,8 +172,9 @@ export class StudentGuardianRelationshipController {
     const { guardianId, ...input } = parseRequest(relationshipInput, body);
     await Promise.all([this.people.requireStudentManage(actor, schoolId), this.people.requireGuardianManage(actor, schoolId)]);
     try { return await withTenantContext(this.database.db, actor.tenantId, async (tx) => {
+      await lockStudentForScope(tx, actor.tenantId, studentId);
       const activeSchoolIds = await listActiveStudentSchoolIds(tx, actor.tenantId, studentId);
-      if (activeSchoolIds.length && !activeSchoolIds.includes(schoolId)) throw new StudentPeopleError('NOT_FOUND', 'Student was not found in this school');
+      if (!activeSchoolIds.includes(schoolId)) throw new StudentPeopleError('NOT_FOUND', 'Student has no active enrollment in this school');
       return createOrUpdateGuardianRelationship(tx, actor.tenantId, studentId, guardianId, input, { actorAccountId: actor.accountId, requestId: actor.requestId });
     }); }
     catch (error) { return mapStudentPeopleError(error); }
@@ -183,8 +189,9 @@ export class StudentGuardianRelationshipController {
     const input = parseRequest(relationshipPatch, body);
     await Promise.all([this.people.requireStudentManage(actor, schoolId), this.people.requireGuardianManage(actor, schoolId)]);
     try { return await withTenantContext(this.database.db, actor.tenantId, async (tx) => {
+      await lockStudentForScope(tx, actor.tenantId, studentId);
       const activeSchoolIds = await listActiveStudentSchoolIds(tx, actor.tenantId, studentId);
-      if (activeSchoolIds.length && !activeSchoolIds.includes(schoolId)) throw new StudentPeopleError('NOT_FOUND', 'Student was not found in this school');
+      if (!activeSchoolIds.includes(schoolId)) throw new StudentPeopleError('NOT_FOUND', 'Student has no active enrollment in this school');
       return updateGuardianRelationship(tx, actor.tenantId, studentId, relationshipId, input, { actorAccountId: actor.accountId, requestId: actor.requestId });
     }); }
     catch (error) { return mapStudentPeopleError(error); }

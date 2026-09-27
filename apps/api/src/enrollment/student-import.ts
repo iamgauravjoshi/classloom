@@ -1,4 +1,5 @@
 import { parse } from 'csv-parse/sync';
+import { normalizeStudentCode } from '@classloom/db';
 
 export const STUDENT_CSV_MAX_BYTES = 2 * 1024 * 1024;
 export const STUDENT_CSV_MAX_ROWS = 1000;
@@ -113,7 +114,23 @@ function optional(value: string | undefined, field: StudentCsvField, row: number
 
 function code(value: string, field: StudentCsvField, row: number, errors: StudentImportPreviewError[], maximum = 40) {
   const normalized = value.trim().toUpperCase();
+  if (field === 'studentCode' || field === 'guardianCode') {
+    try { return normalizeStudentCode(normalized, field === 'studentCode' ? 'Student' : 'Guardian'); }
+    catch (error) { errors.push({ row, field, message: error instanceof Error ? error.message : 'Use a valid person code' }); return normalized; }
+  }
   if (!new RegExp(`^[A-Z0-9][A-Z0-9/_-]{0,${maximum - 1}}$`).test(normalized)) errors.push({ row, field, message: 'Use letters, numbers, slashes, hyphens, or underscores' });
+  return normalized;
+}
+
+function email(value: string, field: 'studentEmail' | 'guardianEmail', row: number, errors: StudentImportPreviewError[]) {
+  const normalized = optional(value, field, row, errors, 254)?.toLowerCase() ?? null;
+  if (normalized && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) errors.push({ row, field, message: 'Email must be a valid email address' });
+  return normalized;
+}
+
+function countryCode(value: string, row: number, errors: StudentImportPreviewError[]) {
+  const normalized = optional(value, 'guardianCountryCode', row, errors, 2)?.toUpperCase() ?? null;
+  if (normalized && !/^[A-Z]{2}$/.test(normalized)) errors.push({ row, field: 'guardianCountryCode', message: 'Country code must use two letters' });
   return normalized;
 }
 
@@ -162,7 +179,7 @@ export function previewStudentCsv(buffer: Buffer, mapping: StudentCsvMapping) {
       preferredName: optional(value(cells, 'studentPreferredName'), 'studentPreferredName', row, errors, 120),
       dateOfBirth: date(value(cells, 'dateOfBirth'), 'dateOfBirth', row, errors),
       gender: optional(value(cells, 'studentGender'), 'studentGender', row, errors, 50),
-      email: optional(value(cells, 'studentEmail'), 'studentEmail', row, errors, 254)?.toLowerCase() ?? null,
+      email: email(value(cells, 'studentEmail'), 'studentEmail', row, errors),
       phone: optional(value(cells, 'studentPhone'), 'studentPhone', row, errors, 30),
     };
     const schoolEnrollment = {
@@ -190,7 +207,7 @@ export function previewStudentCsv(buffer: Buffer, mapping: StudentCsvMapping) {
         middleName: optional(value(cells, 'guardianMiddleName'), 'guardianMiddleName', row, errors, 120),
         familyName: name(value(cells, 'guardianFamilyName'), 'guardianFamilyName', row, errors),
         preferredName: optional(value(cells, 'guardianPreferredName'), 'guardianPreferredName', row, errors, 120),
-        email: optional(value(cells, 'guardianEmail'), 'guardianEmail', row, errors, 254)?.toLowerCase() ?? null,
+        email: email(value(cells, 'guardianEmail'), 'guardianEmail', row, errors),
         phone: optional(value(cells, 'guardianPhone'), 'guardianPhone', row, errors, 30),
         occupation: optional(value(cells, 'guardianOccupation'), 'guardianOccupation', row, errors, 120),
         addressLine1: optional(value(cells, 'guardianAddressLine1'), 'guardianAddressLine1', row, errors),
@@ -198,7 +215,7 @@ export function previewStudentCsv(buffer: Buffer, mapping: StudentCsvMapping) {
         city: optional(value(cells, 'guardianCity'), 'guardianCity', row, errors, 120),
         state: optional(value(cells, 'guardianState'), 'guardianState', row, errors, 120),
         postalCode: optional(value(cells, 'guardianPostalCode'), 'guardianPostalCode', row, errors, 30),
-        countryCode: optional(value(cells, 'guardianCountryCode'), 'guardianCountryCode', row, errors, 2)?.toUpperCase() ?? null,
+        countryCode: countryCode(value(cells, 'guardianCountryCode'), row, errors),
       };
       const relationshipValue = value(cells, 'relationshipType').trim().toLowerCase().replace(/[ -]+/g, '_');
       const relationshipTypes = new Set(['mother', 'father', 'legal_guardian', 'grandparent', 'sibling', 'other']);

@@ -21,7 +21,7 @@ import {
 import { createAccountWithMembership } from './identity-repository.js';
 import { provisionTenant } from './provisioning.js';
 import { studentAcademicEnrollments, studentSchoolEnrollments } from './schema.js';
-import { createStudentProfile } from './students.js';
+import { createGuardianProfile, createOrUpdateGuardianRelationship, createStudentProfile, lockGuardianForScope } from './students.js';
 import { withTenantContext } from './tenant-context.js';
 
 const enabled = Boolean(process.env.DATABASE_URL && process.env.DATABASE_PROVISIONER_URL);
@@ -143,6 +143,33 @@ describe.skipIf(!enabled)('student enrollment persistence', () => {
     }, { actorAccountId }))).rejects.toMatchObject({ code: 'CONFLICT', message: expect.stringMatching(/roll number/i) });
   });
 
+  it('rejects transfer, withdrawal, and completion from an archived source session', async () => {
+    const scope = { tenantId, schoolId };
+    const person = await student('ARCHIVED-SOURCE');
+    const source = await withTenantContext(runtime.db, tenantId, async (tx) => {
+      const session = await createAcademicSession(tx, scope, {
+        name: 'Archived source', code: 'SOURCE-ARCH', startDate: '2025-04-01', endDate: '2026-03-31',
+      });
+      const klass = await createAcademicClass(tx, scope, session.id, { name: 'Grade 7 source', code: 'G7-SOURCE' });
+      const section = await createAcademicSection(tx, scope, klass.id, { name: 'Section A source', code: 'A' });
+      const school = await createSchoolEnrollment(tx, scope, person.id, { admissionNumber: 'ADM-ARCH-SOURCE', admissionDate: '2025-04-01' }, { actorAccountId });
+      const placement = await resolveEnrollmentPlacement(tx, scope, { sessionId: session.id, classId: klass.id, sectionId: section.id });
+      const academic = await createAcademicEnrollment(tx, scope, school.id, placement, { startDate: '2025-04-01' }, { actorAccountId });
+      return { session, academic };
+    });
+    await admin`update academic_sessions set status = 'archived' where id = ${source.session.id}`;
+    const destination = await withTenantContext(runtime.db, tenantId, (tx) => resolveEnrollmentPlacement(tx, scope, { sessionId, classId, sectionId: sectionOneId }));
+    await expect(withTenantContext(runtime.db, tenantId, (tx) => transferAcademicEnrollment(tx, scope, source.academic.id, destination, {
+      startDate: '2026-04-01',
+    }, { actorAccountId }))).rejects.toMatchObject({ code: 'CONFLICT', message: expect.stringMatching(/archived/i) });
+    await expect(withTenantContext(runtime.db, tenantId, (tx) => withdrawAcademicEnrollment(tx, scope, source.academic.id, {
+      effectiveDate: '2025-09-01',
+    }, { actorAccountId }))).rejects.toMatchObject({ code: 'CONFLICT', message: expect.stringMatching(/archived/i) });
+    await expect(withTenantContext(runtime.db, tenantId, (tx) => completeAcademicEnrollment(tx, scope, source.academic.id, {
+      effectiveDate: '2026-03-31',
+    }, { actorAccountId }))).rejects.toMatchObject({ code: 'CONFLICT', message: expect.stringMatching(/archived/i) });
+  });
+
   it('closes placement and school history for withdrawal and completion', async () => {
     const scope = { tenantId, schoolId };
     for (const [code, status] of [['WITHDRAW-1', 'withdrawn'], ['COMPLETE-1', 'completed']] as const) {
@@ -160,6 +187,60 @@ describe.skipIf(!enabled)('student enrollment persistence', () => {
       const [school] = await withTenantContext(runtime.db, tenantId, (tx) => tx.select().from(studentSchoolEnrollments).where(eq(studentSchoolEnrollments.id, created.school.id)));
       expect(school).toMatchObject({ status, leavingDate: status === 'withdrawn' ? '2026-09-01' : '2027-03-31' });
     }
+  });
+
+  it('closes every active session placement when school admission is withdrawn', async () => {
+    const scope = { tenantId, schoolId };
+    const person = await student('MULTI-SESSION');
+    const records = await withTenantContext(runtime.db, tenantId, async (tx) => {
+      const secondSession = await createAcademicSession(tx, scope, { name: 'Overlapping session', code: 'OVERLAP', startDate: '2026-04-01', endDate: '2027-03-31' });
+      const secondClass = await createAcademicClass(tx, scope, secondSession.id, { name: 'Grade 8 overlap', code: 'G8-OVERLAP' });
+      const secondSection = await createAcademicSection(tx, scope, secondClass.id, { name: 'Section A overlap', code: 'A' });
+      const school = await createSchoolEnrollment(tx, scope, person.id, { admissionNumber: 'ADM-MULTI', admissionDate: '2026-04-01' }, { actorAccountId });
+      const firstPlacement = await resolveEnrollmentPlacement(tx, scope, { sessionId, classId, sectionId: sectionOneId });
+      const secondPlacement = await resolveEnrollmentPlacement(tx, scope, { sessionId: secondSession.id, classId: secondClass.id, sectionId: secondSection.id });
+      const first = await createAcademicEnrollment(tx, scope, school.id, firstPlacement, { startDate: '2026-04-01' }, { actorAccountId });
+      const second = await createAcademicEnrollment(tx, scope, school.id, secondPlacement, { startDate: '2026-04-01' }, { actorAccountId });
+      return { school, first, second };
+    });
+    await withTenantContext(runtime.db, tenantId, (tx) => withdrawAcademicEnrollment(tx, scope, records.first.id, { effectiveDate: '2026-09-01' }, { actorAccountId }));
+    const history = await withTenantContext(runtime.db, tenantId, (tx) => listAcademicEnrollmentHistory(tx, scope, records.school.id));
+    expect(history).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: records.first.id, status: 'withdrawn', endDate: '2026-09-01' }),
+      expect.objectContaining({ id: records.second.id, status: 'withdrawn', endDate: '2026-09-01' }),
+    ]));
+  });
+
+  it('waits for a guardian profile edit before changing the guardian school scope', async () => {
+    const scope = { tenantId, schoolId };
+    const person = await student('SCOPE-RACE');
+    const records = await withTenantContext(runtime.db, tenantId, async (tx) => {
+      const guardian = await createGuardianProfile(tx, tenantId, { guardianCode: 'G-SCOPE-RACE', givenName: 'Race', familyName: 'Guardian' }, { actorAccountId });
+      await createOrUpdateGuardianRelationship(tx, tenantId, person.id, guardian.id, { relationshipType: 'mother' }, { actorAccountId });
+      const school = await createSchoolEnrollment(tx, scope, person.id, { admissionNumber: 'ADM-SCOPE-RACE', admissionDate: '2026-04-01' }, { actorAccountId });
+      const placement = await resolveEnrollmentPlacement(tx, scope, { sessionId, classId, sectionId: sectionOneId });
+      const academic = await createAcademicEnrollment(tx, scope, school.id, placement, { startDate: '2026-04-01' }, { actorAccountId });
+      return { guardian, academic };
+    });
+    let release!: () => void;
+    let locked!: () => void;
+    const lockedPromise = new Promise<void>((resolve) => { locked = resolve; });
+    const releasePromise = new Promise<void>((resolve) => { release = resolve; });
+    const holder = withTenantContext(runtime.db, tenantId, async (tx) => {
+      await lockGuardianForScope(tx, tenantId, records.guardian.id);
+      locked();
+      await releasePromise;
+    });
+    await lockedPromise;
+    let finished = false;
+    const closing = withTenantContext(runtime.db, tenantId, (tx) => withdrawAcademicEnrollment(tx, scope, records.academic.id, { effectiveDate: '2026-09-01' }, { actorAccountId }))
+      .finally(() => { finished = true; });
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(finished).toBe(false);
+    } finally { release(); }
+    await holder;
+    await closing;
   });
 
   it('serializes concurrent initial enrollments and transfers', async () => {

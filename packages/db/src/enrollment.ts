@@ -1,7 +1,9 @@
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { EnrollmentPlacementInput } from './academics.js';
 import type { TenantTransaction } from './client.js';
+import { lockActiveStudentGuardiansForScope, lockStudentForScope } from './students.js';
 import {
+  academicSessions,
   guardianProfiles,
   securityEvents,
   studentAcademicEnrollments,
@@ -103,6 +105,7 @@ export async function createSchoolEnrollment(
   )).for('update').limit(1);
   if (!student) throw new EnrollmentError('NOT_FOUND', 'Student was not found');
   if (student.status !== 'active') throw new EnrollmentError('CONFLICT', 'Inactive students cannot be enrolled');
+  await lockActiveStudentGuardiansForScope(tx, scope.tenantId, studentId);
   const [current] = await tx.select({ id: studentSchoolEnrollments.id }).from(studentSchoolEnrollments).where(and(
     eq(studentSchoolEnrollments.tenantId, scope.tenantId), eq(studentSchoolEnrollments.schoolId, scope.schoolId),
     eq(studentSchoolEnrollments.studentId, studentId), eq(studentSchoolEnrollments.status, 'active'),
@@ -187,6 +190,32 @@ async function lockAcademicEnrollment(tx: TenantTransaction, scope: EnrollmentSc
   return record;
 }
 
+async function lockAcademicParent(tx: TenantTransaction, scope: EnrollmentScope, enrollmentId: string) {
+  const [academic] = await tx.select({ schoolEnrollmentId: studentAcademicEnrollments.schoolEnrollmentId }).from(studentAcademicEnrollments).where(and(
+    eq(studentAcademicEnrollments.tenantId, scope.tenantId), eq(studentAcademicEnrollments.schoolId, scope.schoolId),
+    eq(studentAcademicEnrollments.id, enrollmentId),
+  )).limit(1);
+  if (!academic) throw new EnrollmentError('NOT_FOUND', 'Academic enrollment was not found');
+  return requireActiveSchoolEnrollment(tx, scope, academic.schoolEnrollmentId, true);
+}
+
+async function lockStudentAndGuardiansForClose(tx: TenantTransaction, scope: EnrollmentScope, enrollmentId: string) {
+  const [academic] = await tx.select({ studentId: studentAcademicEnrollments.studentId }).from(studentAcademicEnrollments).where(and(
+    eq(studentAcademicEnrollments.tenantId, scope.tenantId), eq(studentAcademicEnrollments.schoolId, scope.schoolId),
+    eq(studentAcademicEnrollments.id, enrollmentId),
+  )).limit(1);
+  if (!academic) throw new EnrollmentError('NOT_FOUND', 'Academic enrollment was not found');
+  await lockStudentForScope(tx, scope.tenantId, academic.studentId);
+  await lockActiveStudentGuardiansForScope(tx, scope.tenantId, academic.studentId);
+}
+
+async function requireWritableSourceSession(tx: TenantTransaction, scope: EnrollmentScope, sessionId: string) {
+  const [session] = await tx.select({ status: academicSessions.status }).from(academicSessions).where(and(
+    eq(academicSessions.tenantId, scope.tenantId), eq(academicSessions.schoolId, scope.schoolId), eq(academicSessions.id, sessionId),
+  )).limit(1);
+  if (!session || session.status === 'archived') throw new EnrollmentError('CONFLICT', 'Archived academic session placements cannot be changed');
+}
+
 export async function transferAcademicEnrollment(
   tx: TenantTransaction,
   scope: EnrollmentScope,
@@ -195,11 +224,12 @@ export async function transferAcademicEnrollment(
   input: AcademicEnrollmentInput & { reason?: string | null },
   auditContext: EnrollmentAudit,
 ) {
+  await lockAcademicParent(tx, scope, enrollmentId);
   const current = await lockAcademicEnrollment(tx, scope, enrollmentId);
   requireActiveEnrollment(current.status, 'transfer');
+  await requireWritableSourceSession(tx, scope, current.sessionId);
   const values = normalizeAcademicEnrollmentInput(input, current.startDate);
   validatePlacementDate(placement, values.startDate);
-  await requireActiveSchoolEnrollment(tx, scope, current.schoolEnrollmentId, true);
   await tx.update(studentAcademicEnrollments).set({
     status: 'transferred', endDate: values.startDate, reason: optionalReason(input.reason), updatedAt: new Date(),
   }).where(and(eq(studentAcademicEnrollments.tenantId, scope.tenantId), eq(studentAcademicEnrollments.id, enrollmentId)));
@@ -233,13 +263,24 @@ async function closeAcademicEnrollment(
   status: 'withdrawn' | 'completed',
   auditContext: EnrollmentAudit,
 ) {
+  await lockStudentAndGuardiansForClose(tx, scope, enrollmentId);
+  await lockAcademicParent(tx, scope, enrollmentId);
   const current = await lockAcademicEnrollment(tx, scope, enrollmentId);
   requireActiveEnrollment(current.status, status === 'withdrawn' ? 'withdraw' : 'complete');
+  await requireWritableSourceSession(tx, scope, current.sessionId);
   const effectiveDate = dateOnly(input.effectiveDate, 'Effective date');
-  if (effectiveDate < current.startDate) throw new EnrollmentError('INVALID', 'Effective date cannot be before the placement start date');
+  const activePlacements = await tx.select().from(studentAcademicEnrollments).where(and(
+    eq(studentAcademicEnrollments.tenantId, scope.tenantId), eq(studentAcademicEnrollments.schoolId, scope.schoolId),
+    eq(studentAcademicEnrollments.schoolEnrollmentId, current.schoolEnrollmentId), eq(studentAcademicEnrollments.status, 'active'),
+  )).orderBy(asc(studentAcademicEnrollments.id)).for('update');
+  if (activePlacements.some((placement) => effectiveDate < placement.startDate)) {
+    throw new EnrollmentError('INVALID', 'Effective date cannot be before an active placement start date');
+  }
+  for (const placement of activePlacements) await requireWritableSourceSession(tx, scope, placement.sessionId);
   const reason = optionalReason(input.reason);
   await tx.update(studentAcademicEnrollments).set({ status, endDate: effectiveDate, reason, updatedAt: new Date() }).where(and(
-    eq(studentAcademicEnrollments.tenantId, scope.tenantId), eq(studentAcademicEnrollments.id, enrollmentId),
+    eq(studentAcademicEnrollments.tenantId, scope.tenantId), eq(studentAcademicEnrollments.schoolId, scope.schoolId),
+    eq(studentAcademicEnrollments.schoolEnrollmentId, current.schoolEnrollmentId), eq(studentAcademicEnrollments.status, 'active'),
   ));
   await tx.update(studentSchoolEnrollments).set({ status, leavingDate: effectiveDate, leavingReason: reason, updatedAt: new Date() }).where(and(
     eq(studentSchoolEnrollments.tenantId, scope.tenantId), eq(studentSchoolEnrollments.schoolId, scope.schoolId),
@@ -247,6 +288,7 @@ async function closeAcademicEnrollment(
   ));
   await audit(tx, scope, `student_academic_enrollment_${status}`, auditContext, {
     studentId: current.studentId, academicEnrollmentId: current.id, schoolEnrollmentId: current.schoolEnrollmentId,
+    closedAcademicEnrollmentIds: activePlacements.map((placement) => placement.id).join(','),
   });
   return lockAcademicEnrollment(tx, scope, enrollmentId);
 }

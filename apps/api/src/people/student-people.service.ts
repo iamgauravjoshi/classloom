@@ -4,6 +4,7 @@ import {
   createOrUpdateGuardianRelationship,
   createStudentProfile,
   findGuardianByCode,
+  findStudentGuardianRelationship,
   findStudentByCode,
   StudentPeopleError,
   type GuardianProfileInput,
@@ -22,6 +23,7 @@ export interface StudentPeoplePersistence {
   createStudent: typeof createStudentProfile;
   createGuardian: typeof createGuardianProfile;
   createRelationship: typeof createOrUpdateGuardianRelationship;
+  findRelationship: typeof findStudentGuardianRelationship;
 }
 
 const defaultPersistence: StudentPeoplePersistence = {
@@ -30,6 +32,7 @@ const defaultPersistence: StudentPeoplePersistence = {
   createStudent: createStudentProfile,
   createGuardian: createGuardianProfile,
   createRelationship: createOrUpdateGuardianRelationship,
+  findRelationship: findStudentGuardianRelationship,
 };
 
 @Injectable()
@@ -125,5 +128,9 @@ export class StudentPeopleService {
     persistence: StudentPeoplePersistence = defaultPersistence,
   ) {
     return persistence.createRelationship(tx, tenantId, studentId, guardianId, input, audit);
+  }
+
+  findRelationship(tx: TenantTransaction, tenantId: string, studentId: string, guardianId: string, persistence: StudentPeoplePersistence = defaultPersistence) {
+    return persistence.findRelationship(tx, tenantId, studentId, guardianId);
   }
 }

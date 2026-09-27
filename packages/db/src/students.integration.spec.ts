@@ -28,6 +28,7 @@ describe.skipIf(!enabled)('student and guardian persistence', () => {
   const otherSlug = `student-people-${randomUUID()}`;
   const actorEmail = `student-actor-${randomUUID()}@example.test`;
   const secondEmail = `student-second-${randomUUID()}@example.test`;
+  const raceEmails = [`student-race-one-${randomUUID()}@example.test`, `student-race-two-${randomUUID()}@example.test`];
   let admin: ReturnType<typeof postgres>;
   let runtime: ReturnType<typeof createDb>;
   let provisioner: ReturnType<typeof createDb>;
@@ -62,7 +63,7 @@ describe.skipIf(!enabled)('student and guardian persistence', () => {
   afterAll(async () => {
     if (admin) {
       await admin`delete from tenants where slug in (${slug}, ${otherSlug})`;
-      await admin`delete from accounts where normalized_email in (${actorEmail}, ${secondEmail})`;
+      await admin`delete from accounts where normalized_email in (${actorEmail}, ${secondEmail}, ${raceEmails[0]}, ${raceEmails[1]})`;
       await admin.end();
     }
     if (runtime) await runtime.close();
@@ -155,5 +156,35 @@ describe.skipIf(!enabled)('student and guardian persistence', () => {
     expect(first.length).toBeGreaterThan(0);
     expect(other).toEqual([]);
     expect(firstAgain.length).toBeGreaterThan(0);
+  });
+
+  it('does not replace the first student or guardian account link in concurrent requests', async () => {
+    const memberships = await Promise.all(raceEmails.map(async (email) =>
+      (await createAccountWithMembership(runtime.db, { email, passwordHash: 'fixture-hash', tenantId })).membershipId));
+    const profiles = await withTenantContext(runtime.db, tenantId, async (tx) => ({
+      student: await createStudentProfile(tx, tenantId, {
+        studentCode: 'RACE-LINK-STU', givenName: 'Race', familyName: 'Student', dateOfBirth: '2013-01-01',
+      }, { actorAccountId }),
+      guardian: await createGuardianProfile(tx, tenantId, {
+        guardianCode: 'RACE-LINK-GUA', givenName: 'Race', familyName: 'Guardian',
+      }, { actorAccountId }),
+    }));
+    const concurrent = createDb(process.env.DATABASE_URL!, { maxConnections: 4 });
+    try {
+      for (const kind of ['student', 'guardian'] as const) {
+        const profileId = profiles[kind].id;
+        const attempts = await Promise.allSettled(memberships.map((membershipId) => withTenantContext(concurrent.db, tenantId, (tx) =>
+          kind === 'student'
+            ? linkStudentMembership(tx, tenantId, profileId, membershipId, { actorAccountId })
+            : linkGuardianMembership(tx, tenantId, profileId, membershipId, { actorAccountId }))));
+        expect(attempts.filter((attempt) => attempt.status === 'fulfilled')).toHaveLength(1);
+        expect(attempts.filter((attempt) => attempt.status === 'rejected')).toHaveLength(1);
+        const [record] = await withTenantContext(runtime.db, tenantId, (tx) => tx.select().from(kind === 'student' ? studentProfiles : guardianProfiles)
+          .where(eq(kind === 'student' ? studentProfiles.id : guardianProfiles.id, profileId)));
+        expect(memberships).toContain(record?.membershipId);
+      }
+    } finally {
+      await concurrent.close();
+    }
   });
 });

@@ -319,6 +319,28 @@ export async function readGuardianProfile(tx: TenantTransaction, tenantId: strin
   return record;
 }
 
+export async function lockStudentForScope(tx: TenantTransaction, tenantId: string, studentId: string) {
+  const [student] = await tx.select({ id: studentProfiles.id }).from(studentProfiles).where(and(
+    eq(studentProfiles.tenantId, tenantId), eq(studentProfiles.id, studentId),
+  )).for('update').limit(1);
+  if (!student) throw new StudentPeopleError('NOT_FOUND', 'Student was not found');
+}
+
+export async function lockGuardianForScope(tx: TenantTransaction, tenantId: string, guardianId: string) {
+  const [guardian] = await tx.select({ id: guardianProfiles.id }).from(guardianProfiles).where(and(
+    eq(guardianProfiles.tenantId, tenantId), eq(guardianProfiles.id, guardianId),
+  )).for('update').limit(1);
+  if (!guardian) throw new StudentPeopleError('NOT_FOUND', 'Guardian was not found');
+}
+
+export async function lockActiveStudentGuardiansForScope(tx: TenantTransaction, tenantId: string, studentId: string) {
+  const guardians = await tx.select({ guardianId: studentGuardianRelationships.guardianId }).from(studentGuardianRelationships).where(and(
+    eq(studentGuardianRelationships.tenantId, tenantId), eq(studentGuardianRelationships.studentId, studentId),
+    eq(studentGuardianRelationships.status, 'active'),
+  )).orderBy(asc(studentGuardianRelationships.guardianId));
+  for (const { guardianId } of guardians) await lockGuardianForScope(tx, tenantId, guardianId);
+}
+
 export async function listGuardianProfilesByIds(
   tx: TenantTransaction,
   tenantId: string,
@@ -398,6 +420,8 @@ export async function createOrUpdateGuardianRelationship(
   input: GuardianRelationshipInput,
   auditContext: StudentPeopleAudit,
 ) {
+  await lockStudentForScope(tx, tenantId, studentId);
+  await lockGuardianForScope(tx, tenantId, guardianId);
   await Promise.all([
     readStudentProfile(tx, tenantId, studentId),
     readGuardianProfile(tx, tenantId, guardianId),
@@ -411,7 +435,16 @@ export async function createOrUpdateGuardianRelationship(
       studentGuardianRelationships.studentId,
       studentGuardianRelationships.guardianId,
     ],
-    set: { ...values, updatedAt: new Date() },
+    set: {
+      relationshipType: values.relationshipType,
+      ...(input.primaryContact !== undefined ? { primaryContact: values.primaryContact } : {}),
+      ...(input.emergencyContact !== undefined ? { emergencyContact: values.emergencyContact } : {}),
+      ...(input.authorizedPickup !== undefined ? { authorizedPickup: values.authorizedPickup } : {}),
+      ...(input.financialResponsibility !== undefined ? { financialResponsibility: values.financialResponsibility } : {}),
+      ...(input.portalAccess !== undefined ? { portalAccess: values.portalAccess } : {}),
+      ...(input.status !== undefined ? { status: values.status } : {}),
+      updatedAt: new Date(),
+    },
   }).returning();
   if (!record) throw new Error('Guardian relationship write did not return a row');
   await audit(tx, tenantId, 'student_guardian_relationship_saved', auditContext, {
@@ -428,12 +461,14 @@ export async function updateGuardianRelationship(
   changes: Partial<GuardianRelationshipInput>,
   auditContext: StudentPeopleAudit,
 ) {
+  await lockStudentForScope(tx, tenantId, studentId);
   const [current] = await tx.select().from(studentGuardianRelationships).where(and(
     eq(studentGuardianRelationships.tenantId, tenantId),
     eq(studentGuardianRelationships.studentId, studentId),
     eq(studentGuardianRelationships.id, relationshipId),
   )).limit(1);
   if (!current) throw new StudentPeopleError('NOT_FOUND', 'Guardian relationship was not found');
+  await lockGuardianForScope(tx, tenantId, current.guardianId);
   const values = normalizeGuardianRelationship({
     relationshipType: changes.relationshipType ?? current.relationshipType as GuardianRelationshipType,
     primaryContact: changes.primaryContact ?? current.primaryContact,
@@ -464,6 +499,15 @@ export async function listStudentGuardians(tx: TenantTransaction, tenantId: stri
       eq(studentGuardianRelationships.tenantId, tenantId),
       eq(studentGuardianRelationships.studentId, studentId),
     )).orderBy(asc(guardianProfiles.familyName), asc(guardianProfiles.givenName));
+}
+
+export async function findStudentGuardianRelationship(tx: TenantTransaction, tenantId: string, studentId: string, guardianId: string) {
+  const [relationship] = await tx.select().from(studentGuardianRelationships).where(and(
+    eq(studentGuardianRelationships.tenantId, tenantId),
+    eq(studentGuardianRelationships.studentId, studentId),
+    eq(studentGuardianRelationships.guardianId, guardianId),
+  )).limit(1);
+  return relationship ?? null;
 }
 
 export async function listGuardianStudents(tx: TenantTransaction, tenantId: string, guardianId: string) {
@@ -519,8 +563,9 @@ async function linkMembership(
   const table = kind === 'student' ? studentProfiles : guardianProfiles;
   const id = table.id;
   const current = kind === 'student'
-    ? await readStudentProfile(tx, tenantId, profileId)
-    : await readGuardianProfile(tx, tenantId, profileId);
+    ? (await tx.select().from(studentProfiles).where(and(eq(studentProfiles.tenantId, tenantId), eq(studentProfiles.id, profileId))).for('update').limit(1))[0]
+    : (await tx.select().from(guardianProfiles).where(and(eq(guardianProfiles.tenantId, tenantId), eq(guardianProfiles.id, profileId))).for('update').limit(1))[0];
+  if (!current) throw new StudentPeopleError('NOT_FOUND', `${kind === 'student' ? 'Student' : 'Guardian'} profile was not found`);
   if (current.membershipId === membershipId) return current;
   if (current.membershipId || await hasLinkHistory(tx, tenantId, kind, profileId)) {
     throw new StudentPeopleError('CONFLICT', `This ${kind} account link has history and cannot be replaced`);
@@ -552,8 +597,9 @@ async function unlinkMembership(
   const table = kind === 'student' ? studentProfiles : guardianProfiles;
   const id = table.id;
   const current = kind === 'student'
-    ? await readStudentProfile(tx, tenantId, profileId)
-    : await readGuardianProfile(tx, tenantId, profileId);
+    ? (await tx.select().from(studentProfiles).where(and(eq(studentProfiles.tenantId, tenantId), eq(studentProfiles.id, profileId))).for('update').limit(1))[0]
+    : (await tx.select().from(guardianProfiles).where(and(eq(guardianProfiles.tenantId, tenantId), eq(guardianProfiles.id, profileId))).for('update').limit(1))[0];
+  if (!current) throw new StudentPeopleError('NOT_FOUND', `${kind === 'student' ? 'Student' : 'Guardian'} profile was not found`);
   if (!current.membershipId) return current;
   await tx.update(table).set({ membershipId: null, updatedAt: new Date() }).where(and(
     eq(table.tenantId, tenantId), eq(id, profileId),

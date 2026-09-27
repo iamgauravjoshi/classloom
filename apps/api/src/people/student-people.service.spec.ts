@@ -52,6 +52,7 @@ describe('StudentPeopleService authorization', () => {
       createStudent,
       createGuardian,
       createRelationship,
+      findRelationship: vi.fn().mockResolvedValue(null),
     };
 
     await expect(service.createOrResolveStudent(tx, 'tenant-a', {
