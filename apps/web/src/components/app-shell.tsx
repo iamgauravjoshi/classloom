@@ -94,8 +94,14 @@ function SidebarContents({ onNavigate }: { onNavigate?: () => void }) {
         <Link href="/staff" className={`nav-row ${pathname === "/staff" ? "nav-row-active" : ""}`} aria-current={pathname === "/staff" ? "page" : undefined} onClick={onNavigate}>
           <GraduationCap size={18} /><span>Teachers & Staff</span><ChevronRight className="nav-chevron" size={16} />
         </Link>
-        <p className="nav-caption nav-caption-spaced">SCHOOL MANAGEMENT <span className="preview-label">SOON</span></p>
-        {upcomingSections.filter((section) => section.icon !== "classes" && section.icon !== "teachers").map((section) => {
+        <p className="nav-caption nav-caption-spaced">SCHOOL MANAGEMENT</p>
+        <Link href="/students" className={`nav-row ${pathname.startsWith("/students") ? "nav-row-active" : ""}`} aria-current={pathname.startsWith("/students") ? "page" : undefined} onClick={onNavigate}>
+          <Users size={18} /><span>Students</span><ChevronRight className="nav-chevron" size={16} />
+        </Link>
+        <Link href="/guardians" className={`nav-row ${pathname.startsWith("/guardians") ? "nav-row-active" : ""}`} aria-current={pathname.startsWith("/guardians") ? "page" : undefined} onClick={onNavigate}>
+          <Users size={18} /><span>Parents & Guardians</span><ChevronRight className="nav-chevron" size={16} />
+        </Link>
+        {upcomingSections.filter((section) => !["classes", "teachers", "students", "parents"].includes(section.icon)).map((section) => {
           const Icon = sectionIcons[section.icon];
           return (
             <div

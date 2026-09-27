@@ -10,9 +10,9 @@ export function parseRequest<T>(schema: z.ZodType<T>, value: unknown): T {
   if (parsed.success) return parsed.data;
   const fields: Record<string, string> = {};
   for (const issue of parsed.error.issues) {
-    const key = String(issue.path[0] ?? 'request');
+    const key = issue.path.length ? issue.path.map(String).join('.') : 'request';
     if (fields[key]) continue;
-    const label = labelFor(key);
+    const label = labelFor(String(issue.path.at(-1) ?? 'request'));
     fields[key] = issue.code === 'invalid_type'
       ? `${label} is required or has an invalid value`
       : issue.message === 'Invalid input' ? `Please check ${label.toLowerCase()}` : issue.message;

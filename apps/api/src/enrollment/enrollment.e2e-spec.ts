@@ -104,6 +104,29 @@ describe.skipIf(!enabled)('student guardian and enrollment API', () => {
     expect(invalid.body.details.fields).toMatchObject({ givenName: expect.any(String), dateOfBirth: expect.any(String) });
   });
 
+  it('atomically admits a student and connects a guardian', async () => {
+    const base = `/api/v1/enrollment/schools/${schoolId}/admissions`;
+    const input = {
+      student: { studentCode: 'S-API-ATOMIC', givenName: 'Diya', familyName: 'Mehta', dateOfBirth: '2014-05-10' },
+      schoolEnrollment: { admissionNumber: 'ADM-API-ATOMIC', admissionDate: '2026-04-01' },
+      academicEnrollment: { sessionId, classId, sectionId: sectionOneId, startDate: '2026-04-01' },
+      guardians: [{ guardian: { guardianCode: 'G-API-ATOMIC', givenName: 'Nisha', familyName: 'Mehta' }, relationship: { relationshipType: 'mother', primaryContact: true } }],
+    };
+    const invalid = await request(app.getHttpServer()).post(base).set({ ...mutationHeaders, Cookie: adminCookie })
+      .send({ ...input, academicEnrollment: { ...input.academicEnrollment, sectionId: randomUUID() } });
+    expect(invalid.status).toBe(404);
+    const [rolledBack] = await admin<{ count: number }[]>`select count(*)::int as count from student_profiles where tenant_id = ${tenantId} and student_code = 'S-API-ATOMIC'`;
+    expect(rolledBack!.count).toBe(0);
+    const admitted = await request(app.getHttpServer()).post(base).set({ ...mutationHeaders, Cookie: adminCookie }).send(input);
+    expect(admitted.status).toBe(201);
+    expect(admitted.body).toMatchObject({ student: { studentCode: 'S-API-ATOMIC' }, schoolEnrollment: { admissionNumber: 'ADM-API-ATOMIC' }, academicEnrollment: { sectionId: sectionOneId }, guardians: [{ guardian: { guardianCode: 'G-API-ATOMIC' }, relationship: { primaryContact: true } }] });
+    const anotherGuardian = await request(app.getHttpServer()).post(`/api/v1/people/schools/${schoolId}/students/${admitted.body.student.id}/guardians/new`)
+      .set({ ...mutationHeaders, Cookie: adminCookie }).send({ guardian: { guardianCode: 'G-API-ATOMIC-2', givenName: 'Raj', familyName: 'Mehta' }, relationship: { relationshipType: 'father', emergencyContact: true } });
+    expect(anotherGuardian.status).toBe(201);
+    const profile = await request(app.getHttpServer()).get(`/api/v1/people/schools/${schoolId}/students/${admitted.body.student.id}`).set('Cookie', schoolCookie);
+    expect(profile.body.guardians).toHaveLength(2);
+  });
+
   it('creates searchable students, reusable guardians, relationships, and account links', async () => {
     const base = `/api/v1/people/schools/${schoolId}`;
     const student = await request(app.getHttpServer()).post(`${base}/students`).set({ ...mutationHeaders, Cookie: adminCookie }).send({
@@ -149,6 +172,17 @@ describe.skipIf(!enabled)('student guardian and enrollment API', () => {
     await request(app.getHttpServer()).post(`/api/v1/enrollment/schools/${otherSchoolId}/students/${student.body.id}/school-enrollments`).set({ ...mutationHeaders, Cookie: adminCookie }).send({
       admissionNumber: 'ADM-OTHER-1', admissionDate: '2026-04-01',
     }).expect(201);
+    const otherStudent = await request(app.getHttpServer()).post(`/api/v1/people/schools/${otherSchoolId}/students`).set({ ...mutationHeaders, Cookie: adminCookie }).send({
+      studentCode: 'S-OTHER-SCOPE', givenName: 'Leena', familyName: 'Rao', dateOfBirth: '2013-01-01',
+    });
+    await request(app.getHttpServer()).post(`/api/v1/enrollment/schools/${otherSchoolId}/students/${otherStudent.body.id}/school-enrollments`).set({ ...mutationHeaders, Cookie: adminCookie }).send({
+      admissionNumber: 'ADM-OTHER-SCOPE', admissionDate: '2026-04-01',
+    }).expect(201);
+    await request(app.getHttpServer()).post(`/api/v1/people/schools/${otherSchoolId}/students/${otherStudent.body.id}/guardians`).set({ ...mutationHeaders, Cookie: adminCookie }).send({
+      guardianId: guardian.body.id, relationshipType: 'father',
+    }).expect(201);
+    const schoolScopedGuardian = await request(app.getHttpServer()).get(`${base}/guardians/${guardian.body.id}`).set('Cookie', schoolCookie);
+    expect(schoolScopedGuardian.body.students.map((item: { student: { id: string } }) => item.student.id)).not.toContain(otherStudent.body.id);
     const forbiddenShared = await request(app.getHttpServer()).patch(`${base}/students/${student.body.id}`).set({ ...mutationHeaders, Cookie: schoolCookie }).send({ preferredName: 'Ash' });
     expect(forbiddenShared.status).toBe(403);
     const allowedShared = await request(app.getHttpServer()).patch(`${base}/students/${student.body.id}`).set({ ...mutationHeaders, Cookie: adminCookie }).send({ preferredName: 'Ash' });

@@ -7,6 +7,7 @@ import {
   linkGuardianMembership,
   listActiveGuardianSchoolIds,
   listActiveStudentSchoolIds,
+  listSchoolStudentIds,
   listGuardianProfilesByIds,
   listGuardianStudents,
   listSchoolGuardianIds,
@@ -43,6 +44,10 @@ const relationshipFields = {
   financialResponsibility: z.boolean().optional(), portalAccess: z.boolean().optional(), status: z.enum(['active', 'inactive']).optional(),
 };
 const relationshipInput = z.object({ guardianId: uuid, ...relationshipFields }).strict();
+const newGuardianRelationshipInput = z.object({
+  guardian: createInput,
+  relationship: z.object(relationshipFields).strict(),
+}).strict();
 const relationshipPatch = z.object(relationshipFields).partial().strict().refine((value) => Object.keys(value).length > 0, 'Choose relationship details to update');
 const accountInput = z.object({ membershipId: uuid }).strict();
 const listFilters = z.object({ q: z.string().trim().max(120).optional(), status: z.enum(['active', 'inactive']).optional(), cursor: uuid.optional(), limit: z.coerce.number().int().min(1).max(100).optional() }).strict();
@@ -83,7 +88,11 @@ export class GuardianDirectoryController {
     await this.people.requireGuardianRead(actor, schoolId);
     try { return await withTenantContext(this.database.db, actor.tenantId, async (tx) => {
       if (!(await listSchoolGuardianIds(tx, { tenantId: actor.tenantId, schoolId })).includes(guardianId)) throw new StudentPeopleError('NOT_FOUND', 'Guardian was not found in this school');
-      return { ...await readGuardianProfile(tx, actor.tenantId, guardianId), students: await listGuardianStudents(tx, actor.tenantId, guardianId) };
+      const activeSchoolIds = await listActiveGuardianSchoolIds(tx, actor.tenantId, guardianId);
+      const canEditShared = activeSchoolIds.length > 0 && await Promise.all(activeSchoolIds.map((id) => this.people.requireGuardianManage(actor, id).then(() => true, () => false))).then((results) => results.every(Boolean));
+      const visibleStudentIds = new Set(await listSchoolStudentIds(tx, { tenantId: actor.tenantId, schoolId }));
+      const students = (await listGuardianStudents(tx, actor.tenantId, guardianId)).filter((item) => visibleStudentIds.has(item.student.id));
+      return { ...await readGuardianProfile(tx, actor.tenantId, guardianId), students, canEditShared };
     }); } catch (error) { return mapStudentPeopleError(error); }
   }
 
@@ -133,6 +142,22 @@ export class GuardianDirectoryController {
 @UseGuards(AuthGuard, CsrfGuard)
 export class StudentGuardianRelationshipController {
   constructor(@Inject(DatabaseService) private readonly database: DatabaseService, @Inject(StudentPeopleService) private readonly people: StudentPeopleService) {}
+
+  @Post('new')
+  async createGuardianAndRelationship(@Req() request: AuthenticatedRequest, @Param('schoolId') schoolIdValue: string, @Param('studentId') studentIdValue: string, @Body() body: unknown) {
+    const actor = studentPeopleActor(request);
+    const schoolId = parseRequest(uuid, schoolIdValue);
+    const studentId = parseRequest(uuid, studentIdValue);
+    const input = parseRequest(newGuardianRelationshipInput, body);
+    await Promise.all([this.people.requireStudentManage(actor, schoolId), this.people.requireGuardianManage(actor, schoolId)]);
+    try { return await withTenantContext(this.database.db, actor.tenantId, async (tx) => {
+      if (!(await listActiveStudentSchoolIds(tx, actor.tenantId, studentId)).includes(schoolId)) throw new StudentPeopleError('NOT_FOUND', 'Student has no active enrollment in this school');
+      const audit = { actorAccountId: actor.accountId, requestId: actor.requestId };
+      const guardian = await this.people.createOrResolveGuardian(tx, actor.tenantId, input.guardian, audit);
+      const relationship = await this.people.createOrResolveRelationship(tx, actor.tenantId, studentId, guardian.id, input.relationship, audit);
+      return { guardian, relationship };
+    }); } catch (error) { return mapStudentPeopleError(error); }
+  }
 
   @Post()
   async create(@Req() request: AuthenticatedRequest, @Param('schoolId') schoolIdValue: string, @Param('studentId') studentIdValue: string, @Body() body: unknown) {

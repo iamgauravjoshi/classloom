@@ -8,7 +8,10 @@ import {
   type AcademicEnrollmentInput,
   type EnrollmentCloseInput,
   type EnrollmentPlacementInput,
+  type GuardianProfileInput,
+  type GuardianRelationshipInput,
   type SchoolEnrollmentInput,
+  type StudentProfileInput,
   type TenantTransaction,
 } from '@classloom/db';
 import { AcademicsService } from '../academics/academics.service.js';
@@ -22,6 +25,13 @@ export interface EnrollmentPersistence {
   withdraw: typeof withdrawAcademicEnrollment;
   complete: typeof completeAcademicEnrollment;
 }
+
+export type StudentAdmissionInput = {
+  student: StudentProfileInput;
+  schoolEnrollment: SchoolEnrollmentInput;
+  academicEnrollment: EnrollmentPlacementInput & AcademicEnrollmentInput;
+  guardians?: { guardian: GuardianProfileInput; relationship: GuardianRelationshipInput }[];
+};
 
 const defaultPersistence: EnrollmentPersistence = {
   createSchool: createSchoolEnrollment,
@@ -52,6 +62,24 @@ export class EnrollmentService {
 
   requireManage(actor: StudentPeopleActor, schoolId: string) {
     return this.require(actor, schoolId, 'enrollment.manage', 'Enrollment changes are not allowed for this school');
+  }
+
+  async admitStudent(tx: TenantTransaction, actor: StudentPeopleActor, schoolId: string, input: StudentAdmissionInput) {
+    await Promise.all([
+      this.people.requireStudentManage(actor, schoolId), this.requireManage(actor, schoolId),
+      ...(input.guardians?.length ? [this.people.requireGuardianManage(actor, schoolId)] : []),
+    ]);
+    const audit = { actorAccountId: actor.accountId, requestId: actor.requestId };
+    const student = await this.people.createOrResolveStudent(tx, actor.tenantId, input.student, audit);
+    const schoolEnrollment = await this.createSchoolEnrollment(tx, actor, schoolId, student.id, input.schoolEnrollment);
+    const academicEnrollment = await this.createAcademicEnrollment(tx, actor, schoolId, schoolEnrollment.id, input.academicEnrollment);
+    const guardians = [];
+    for (const entry of input.guardians ?? []) {
+      const guardian = await this.people.createOrResolveGuardian(tx, actor.tenantId, entry.guardian, audit);
+      const relationship = await this.people.createOrResolveRelationship(tx, actor.tenantId, student.id, guardian.id, entry.relationship, audit);
+      guardians.push({ guardian, relationship });
+    }
+    return { student, schoolEnrollment, academicEnrollment, guardians };
   }
 
   async createSchoolEnrollment(tx: TenantTransaction, actor: StudentPeopleActor, schoolId: string, studentId: string, input: SchoolEnrollmentInput) {

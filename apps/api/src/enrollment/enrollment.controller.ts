@@ -27,6 +27,30 @@ const transferInput = z.object({
   effectiveDate: z.iso.date(), reason: z.string().trim().max(500).nullable().optional(),
 }).strict();
 const closeInput = z.object({ effectiveDate: z.iso.date(), reason: z.string().trim().max(500).nullable().optional() }).strict();
+const optionalText = (maximum: number) => z.string().trim().max(maximum).nullable().optional();
+const admissionInput = z.object({
+  student: z.object({
+    studentCode: z.string().trim().min(1).max(20), givenName: z.string().trim().min(2).max(120),
+    middleName: optionalText(120), familyName: z.string().trim().min(2).max(120), preferredName: optionalText(120),
+    dateOfBirth: z.iso.date(), gender: optionalText(50), email: optionalText(254), phone: optionalText(30),
+  }).strict(),
+  schoolEnrollment: schoolEnrollmentInput,
+  academicEnrollment: academicEnrollmentInput,
+  guardians: z.array(z.object({
+    guardian: z.object({
+      guardianCode: z.string().trim().min(1).max(20), givenName: z.string().trim().min(2).max(120),
+      middleName: optionalText(120), familyName: z.string().trim().min(2).max(120), preferredName: optionalText(120),
+      email: optionalText(254), phone: optionalText(30), occupation: optionalText(120),
+      addressLine1: optionalText(240), addressLine2: optionalText(240), city: optionalText(120),
+      state: optionalText(120), postalCode: optionalText(30), countryCode: optionalText(2),
+    }).strict(),
+    relationship: z.object({
+      relationshipType: z.enum(['mother', 'father', 'legal_guardian', 'grandparent', 'sibling', 'other']),
+      primaryContact: z.boolean().optional(), emergencyContact: z.boolean().optional(), authorizedPickup: z.boolean().optional(),
+      financialResponsibility: z.boolean().optional(), portalAccess: z.boolean().optional(),
+    }).strict(),
+  }).strict()).max(10).optional(),
+}).strict();
 
 function mapEnrollmentError(error: unknown): never {
   if (error instanceof EnrollmentError || error instanceof AcademicSetupError || error instanceof StudentPeopleError) {
@@ -42,6 +66,15 @@ function mapEnrollmentError(error: unknown): never {
 @UseGuards(AuthGuard, CsrfGuard)
 export class EnrollmentController {
   constructor(@Inject(DatabaseService) private readonly database: DatabaseService, @Inject(EnrollmentService) private readonly enrollment: EnrollmentService) {}
+
+  @Post('admissions')
+  async admit(@Req() request: AuthenticatedRequest, @Param('schoolId') schoolIdValue: string, @Body() body: unknown) {
+    const actor = studentPeopleActor(request);
+    const schoolId = parseRequest(uuid, schoolIdValue);
+    const input = parseRequest(admissionInput, body);
+    try { return await withTenantContext(this.database.db, actor.tenantId, (tx) => this.enrollment.admitStudent(tx, actor, schoolId, input)); }
+    catch (error) { return mapEnrollmentError(error); }
+  }
 
   @Get('students/:studentId/school-enrollments')
   async schoolHistory(@Req() request: AuthenticatedRequest, @Param('schoolId') schoolIdValue: string, @Param('studentId') studentIdValue: string) {

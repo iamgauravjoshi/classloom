@@ -6,7 +6,8 @@ const JSON_LIMIT = 16_384;
 const MULTIPART_LIMIT = 2 * 1024 * 1024 + 32 * 1024;
 
 function allowed(method: string, path: string[]): boolean {
-  if (path.length < 4 || path[0] !== "schools" || !uuid.test(path[1] ?? "")) return false;
+  if (path.length < 3 || path[0] !== "schools" || !uuid.test(path[1] ?? "")) return false;
+  if (path.length === 3 && path[2] === "admissions") return method === "POST";
   if (path[2] === "imports") return path.length === 5 && path[3] === "students" && ["inspect", "preview", "commit"].includes(path[4]!) && method === "POST";
   if (path[2] === "students") return path.length === 5 && uuid.test(path[3] ?? "") && path[4] === "school-enrollments" && ["GET", "POST"].includes(method);
   if (path[2] === "school-enrollments") return path.length === 5 && uuid.test(path[3] ?? "") && path[4] === "academic-enrollments" && ["GET", "POST"].includes(method);

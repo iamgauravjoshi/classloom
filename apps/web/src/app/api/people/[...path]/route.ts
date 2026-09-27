@@ -12,6 +12,7 @@ function allowed(method: string, path: string[]) {
     if (path.length === 4) return method === "GET" || method === "PATCH";
     if (path.length === 5 && path[4] === "account") return method === "PUT" || method === "DELETE";
     if (path[2] === "students" && path.length === 5 && path[4] === "guardians") return method === "POST";
+    if (path[2] === "students" && path.length === 6 && path[4] === "guardians" && path[5] === "new") return method === "POST";
     return path[2] === "students" && path.length === 6 && path[4] === "guardians" && uuid.test(path[5] ?? "") && method === "PATCH";
   }
   if (path.length === 3) return path[2] === "staff" && (method === "GET" || method === "POST") || path[2] === "eligible-accounts" && method === "GET";
