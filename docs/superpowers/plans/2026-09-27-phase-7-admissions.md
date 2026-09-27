@@ -45,7 +45,7 @@
 
 **Interfaces:**
 - Produces permission keys `admissions.read`, `admissions.manage`, and `admissions.convert`, each school-scoped; built-in `admission_officer` role grants all three. Tenant and school administrators receive all three; principal and auditor receive read only.
-- Produces Drizzle tables `admissionCases` and `admissionCaseEvents`, exported through `packages/db/src/index.ts`, with tenant/school scoped keys, RLS, status checks, case-reference uniqueness, and immutable event rows at the application API.
+- Produces Drizzle tables `admissionCases`, `admissionCaseGuardians`, and `admissionCaseEvents`, exported through `packages/db/src/index.ts`, with tenant/school scoped keys, RLS, status checks, case-reference uniqueness, bounded guardian ordinals, and immutable event rows at the application API.
 
 - [ ] **Step 1: Write failing permission/catalog tests** asserting exact permission metadata and grants for the tenant administrator, school administrator, principal, auditor, and `admission_officer`, with no broad `student.manage`/`enrollment.manage` grants to the Admission Officer role.
 - [ ] **Step 2: Run** `pnpm --filter @classloom/db exec vitest run src/authorization-catalog.spec.ts` and confirm the new expectations fail.
@@ -66,9 +66,9 @@
 **Interfaces:**
 - `AdmissionScope = { tenantId: string; schoolId: string }`.
 - `AdmissionActor = { accountId: string; membershipId: string; requestId?: string }`; `AdmissionTransitionAction = 'submit' | 'start_review' | 'return_to_draft' | 'accept' | 'reject' | 'withdraw'`.
-- `createAdmissionCase(tx, scope, input, actor)` creates `enquiry` or `draft` and its initial event.
-- `getAdmissionCase(tx, scope, caseId)` and `listAdmissionCases(tx, scope, filters)` return school-scoped records; filters support bounded `q`, status, `requestedSessionId`, `createdFrom`, `createdTo`, cursor, and limit.
-- `updateAdmissionCase(tx, scope, caseId, input, actor)` edits applicant/application data only in `enquiry` or `draft`.
+- `createAdmissionCase(tx, scope, input, actor)` creates `enquiry` or `draft`, up to 10 guardian application rows, and its initial event.
+- `getAdmissionCase(tx, scope, caseId)` returns one case with its guardian application rows; `listAdmissionCases(tx, scope, filters)` returns paged worklist rows; filters support bounded `q`, status, `requestedSessionId`, `createdFrom`, `createdTo`, cursor, and limit.
+- `updateAdmissionCase(tx, scope, caseId, input, actor)` edits applicant/application and guardian fields only in `enquiry` or `draft`.
 - `transitionAdmissionCase(tx, scope, caseId, action: AdmissionTransitionAction, actor, note?)` locks the case row, enforces the spec transition table, and atomically appends event and security audit metadata.
 - `recordAdmissionConversion(tx, scope, caseId, conversionRefs, actor)` locks and accepts only `accepted`, writes all conversion references, sets `admitted`, and appends event/audit atomically.
 

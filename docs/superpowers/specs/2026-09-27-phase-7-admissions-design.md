@@ -35,6 +35,8 @@ An `admission_cases` record is tenant- and school-scoped and has a stable opaque
 
 Application data is retained after admission or rejection so staff can understand what was reviewed. Personal data is not copied into audit metadata. A school may not hard-delete an admission case through the API. Where case data correction is necessary, updates are allowed only in `enquiry` or `draft`; submitted case changes require an explicit return-to-draft action and event history.
 
+Guardian application details live in up to 10 `admission_case_guardians` rows keyed to the case and school. Each row stores the applicant's guardian identity/contact details, relationship type, and responsibility flags. Rows use tenant-safe foreign keys and forced RLS; an explicitly linked existing guardian profile is validated through People at conversion time.
+
 ### Event history
 
 An `admission_case_events` record is appended for each status transition and review/decision action. It contains tenant, school, case, actor membership/account identifiers, previous and new status, event type, timestamp, and bounded non-sensitive reason/category metadata. Event rows are immutable through application APIs. Audit metadata contains identifiers and status values, not names, birth dates, email addresses, phone numbers, or application contents.
