@@ -70,6 +70,7 @@ An authorized reviewer may make the final decision; a second-person approval is 
 
 Use versioned school-scoped routes:
 
+- `GET /api/v1/admissions/schools` — list only schools where the active membership has admissions read, manage, or convert access, including `canReadAdmissions`, `canManageAdmissions`, and `canConvertAdmissions` flags for UI choices.
 - `GET|POST /api/v1/admissions/schools/:schoolId/cases` — bounded cursor-paginated worklist and create an enquiry or draft.
 - `GET|PATCH /api/v1/admissions/schools/:schoolId/cases/:caseId` — read details; edit applicant/application fields only while editable under lifecycle rules.
 - `POST /api/v1/admissions/schools/:schoolId/cases/:caseId/submit` — validate required applicant and requested placement data, then submit.
