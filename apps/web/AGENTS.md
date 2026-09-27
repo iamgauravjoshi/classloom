@@ -43,3 +43,5 @@ Use Faker.js (`@faker-js/faker`) to create plausible development, demo, and test
 ## Tests and Checks
 
 Place focused Vitest tests beside the helper or feature, using the existing `*.test.ts` naming pattern in this app. Run `pnpm --filter @classloom/web test`, `pnpm --filter @classloom/web lint`, and `pnpm --filter @classloom/web typecheck` as relevant. Use root commands for workspace-wide verification. Update screenshots or UX documentation only when required by the change.
+
+Before implementing or changing visible UI, read `/DESIGN.md`.
