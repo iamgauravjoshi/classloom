@@ -1,0 +1,11 @@
+# ADR-0007: School-session weekly timetable ownership and publication
+
+**Status:** Accepted for Phase 8 implementation
+
+**Context:** Schools need to schedule recurring weekly lessons across sections, subjects, teachers, and rooms. Schedules must prevent simultaneous conflicts and let staff review a draft before making it available. Timetable data must remain isolated by tenant and school, while academic sessions and teacher assignments remain owned by Academics.
+
+**Decision:** Add a Timetable domain that owns one weekly timetable per school and academic session, its day/time slots, conflict validation, publication state, audit records, API, and user interface. Timetable references sections, subjects, and optional teacher assignments through explicit Academics application contracts. A slot may be unassigned; assigned teachers must be eligible for that section and subject. Timetables use a draft/published lifecycle. Any edit to a published timetable returns it to draft, and read-only users see only published schedules. Serialize writes on the parent timetable row before conflict checks. Use school-local recurring weekday/time values and an optional normalized room label.
+
+**Alternatives:** Storing arbitrary schedules in Academic Setup would mix timetable lifecycle with academic configuration. Requiring a bell schedule, rotating cycles, or campus variants in the first release would add separate configuration and migration concerns. Daily substitutions and one-off exceptions need effective-date history and a distinct operational workflow. Creating fake user accounts for sample timetables would bypass the existing identity and teacher eligibility rules.
+
+**Consequences:** Timetable can evolve independently while validating Academics-owned references through an explicit contract. Draft changes are not visible to read-only users until republished. Conflict checks serialize within a school/session timetable and cover section, eligible teacher, and room overlaps. Local demo seeding may create reserved synthetic subjects and unassigned timetable slots, but never accounts or credentials. Bell schedules, daily changes, rotating cycles, campus-specific schedules, and student/guardian portals remain deferred.
