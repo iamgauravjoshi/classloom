@@ -21,4 +21,4 @@ Read [`AGENTS.md`](AGENTS.md) before changing frontend code. It contains the det
 
 Protected pages must rely on server-resolved sessions, and the API remains authoritative for permissions and tenant access. Browser API mutations must preserve the existing same-origin proxy and CSRF header behavior. Do not expose `API_INTERNAL_URL` to client-side code.
 
-See [authentication development](../../docs/development/authentication.md) and [academic setup](../../docs/development/academic-setup.md) for the implemented flows.
+See [authentication development](../../docs/development/authentication.md), [academic setup](../../docs/development/academic-setup.md), and [students, guardians, and enrollment](../../docs/development/students-guardians-enrollment.md) for the implemented flows.
