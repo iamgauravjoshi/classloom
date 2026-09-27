@@ -151,9 +151,9 @@
 - Create: `docs/decisions/ADR-0006-phase-7-admissions.md`
 - Create or modify: `docs/product/phase-7-admissions.md`
 
-- [ ] **Step 1: Document** Admissions ownership, explicit People/Enrollment contracts, permission grants and Admission Officer, workflow/status transitions, conversion behavior, and local use; record any durable domain decision in the ADR.
-- [ ] **Step 2: Run** `pnpm db:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`, `pnpm --filter @classloom/api test:e2e`, and the relevant Postgres-backed DB/API checks with `.env` loaded.
-- [ ] **Step 3: Inspect the migration and run it locally** using `pnpm db:migrate`; verify restricted-runtime RLS and role seeding for both existing and newly provisioned tenants.
-- [ ] **Step 4: Review the UI** at desktop and narrow viewport widths for the worklist, case creation/detail, status history, and conversion form; correct accessibility, contrast, and responsive issues.
-- [ ] **Step 5: Run** `git diff --check`, inspect `git status` and the full branch diff; report commands that could not run and their exact environment blocker.
-- [ ] **Step 6: Commit** as `docs: document phase 7 admissions`.
+- [x] **Step 1: Document** Admissions ownership, explicit People/Enrollment contracts, permission grants and Admission Officer, workflow/status transitions, conversion behavior, and local use; record any durable domain decision in the ADR.
+- [x] **Step 2: Run** `pnpm db:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`, `pnpm --filter @classloom/api test:e2e`, and the relevant Postgres-backed DB/API checks with `.env` loaded. The root `pnpm test` attempt hit Vitest worker start/termination timeouts; all three workspace package suites passed when rerun serially, and the canonical API E2E command passed.
+- [x] **Step 3: Inspect the migration and run it locally** using `pnpm db:migrate`; verify restricted-runtime RLS and role seeding for both existing and newly provisioned tenants. Migration 0012 has forced RLS and grants for the runtime role; its tenant role seed covers existing tenants, and `seedTenantAuthorization` is used during tenant provisioning and covered by DB tests.
+- [ ] **Step 4: Review the UI** at desktop and narrow viewport widths for the worklist, case creation/detail, status history, and conversion form; correct accessibility, contrast, and responsive issues. Component tests and static responsive-class review passed, but visual browser inspection could not run because the computer-use transport was unavailable.
+- [x] **Step 5: Run** `git diff --check`, inspect `git status` and the full branch diff; report commands that could not run and their exact environment blocker.
+- [x] **Step 6: Commit** as `docs: document phase 7 admissions`.
