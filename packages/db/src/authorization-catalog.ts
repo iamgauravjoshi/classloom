@@ -17,6 +17,8 @@ export const PERMISSION_CATALOG = [
   { key: 'admissions.read', family: 'admissions', scopeKind: 'school', action: 'read', readOnly: true },
   { key: 'admissions.manage', family: 'admissions', scopeKind: 'school', action: 'manage', readOnly: false },
   { key: 'admissions.convert', family: 'admissions', scopeKind: 'school', action: 'convert', readOnly: false },
+  { key: 'timetable.read', family: 'timetable', scopeKind: 'school', action: 'read', readOnly: true },
+  { key: 'timetable.manage', family: 'timetable', scopeKind: 'school', action: 'manage', readOnly: false },
   { key: 'campus.read', family: 'campus', scopeKind: 'campus', action: 'read', readOnly: true },
   { key: 'campus.manage', family: 'campus', scopeKind: 'campus', action: 'manage', readOnly: false },
   { key: 'attendance.read', family: 'attendance', scopeKind: 'campus', action: 'read', readOnly: true },
@@ -45,6 +47,7 @@ export const BUILT_IN_ROLE_TEMPLATES = [
       'staff.read', 'staff.manage',
       'student.read', 'student.manage', 'guardian.read', 'guardian.manage', 'enrollment.read', 'enrollment.manage',
       'admissions.read', 'admissions.manage', 'admissions.convert',
+      'timetable.read', 'timetable.manage',
       'attendance.read', 'attendance.record', 'marks.read', 'marks.enter',
       'results.publish', 'finance.read', 'payments.record', 'payments.adjust', 'reports.export',
     ],
@@ -54,11 +57,12 @@ export const BUILT_IN_ROLE_TEMPLATES = [
     permissionKeys: [
       'school.read', 'staff.read', 'student.read', 'guardian.read', 'enrollment.read', 'campus.read', 'attendance.read', 'marks.read',
       'admissions.read', 'marks.enter', 'results.publish', 'finance.read', 'reports.export',
+      'timetable.read',
     ],
   },
   {
     key: 'teacher', name: 'Teacher',
-    permissionKeys: ['school.read', 'campus.read', 'attendance.read', 'attendance.record', 'marks.read', 'marks.enter'],
+    permissionKeys: ['school.read', 'campus.read', 'attendance.read', 'attendance.record', 'marks.read', 'marks.enter', 'timetable.read'],
   },
   {
     key: 'attendance_operator', name: 'Attendance operator',
