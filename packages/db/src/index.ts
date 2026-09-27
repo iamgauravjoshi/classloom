@@ -103,6 +103,18 @@ export type {
   GuardianRelationshipType,
 } from './students.js';
 export { withTenantContext } from './tenant-context.js';
+export {
+  TimetableError,
+  normalizeTimetableSlotInput,
+  readWeeklyTimetable,
+  lockOrCreateWeeklyTimetable,
+  lockWeeklyTimetableForSlot,
+  insertTimetableSlot,
+  updateTimetableSlot,
+  deleteTimetableSlot,
+  publishWeeklyTimetable,
+} from './timetable.js';
+export type { TimetableScope, TimetableActor, TimetableSlotInput, TimetableFilters } from './timetable.js';
 export { AcademicSetupError, validateAcademicCode, validateAcademicSession, resolveEnrollmentPlacement, resolveEnrollmentPlacementByCodes, listAcademicSchools, listActiveAcademicMembers, readAcademicSetup, createAcademicSession, createAcademicClass, createAcademicSection, createAcademicSubject, createAcademicAssignment, activateAcademicSession } from './academics.js';
 export type { EnrollmentPlacementInput } from './academics.js';
 export {
