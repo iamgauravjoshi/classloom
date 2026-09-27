@@ -85,6 +85,13 @@
       "when": 1790430563515,
       "tag": "0011_phase6_students_enrollment",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1790506774710,
+      "tag": "0012_phase7_admissions",
+      "breakpoints": true
     }
   ]
 }

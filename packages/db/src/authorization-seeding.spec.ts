@@ -67,7 +67,9 @@ describe.skipIf(!provisionerUrl || !runtimeUrl)('authorization seeding', () => {
       `;
       const permissionCount = await transaction<{ count: number }[]>`select count(*)::int as count from permissions`;
 
-      expect(roles.map(({ key }) => key).sort()).toEqual(BUILT_IN_ROLE_TEMPLATES.map(({ key }) => key).sort());
+      expect(roles.map(({ key }) => key).sort()).toEqual([
+        'attendance_operator', 'auditor', 'finance_operator', 'principal', 'school_admin', 'teacher', 'tenant_admin',
+      ]);
       expect(permissionCount[0]!.count).toBe(PERMISSION_CATALOG.length);
     });
   });

@@ -35,7 +35,7 @@ describe('authorization catalog', () => {
   it('defines the approved initial role keys', () => {
     expect(BUILT_IN_ROLE_TEMPLATES.map((role) => role.key)).toEqual([
       'tenant_admin', 'school_admin', 'principal', 'teacher',
-      'attendance_operator', 'finance_operator', 'auditor',
+      'attendance_operator', 'finance_operator', 'auditor', 'admission_officer',
     ]);
   });
 
@@ -68,5 +68,22 @@ describe('authorization catalog', () => {
     expect(role('principal')).toEqual(expect.arrayContaining(read));
     expect(role('auditor')).toEqual(expect.arrayContaining(read));
     expect(role('teacher')).not.toEqual(expect.arrayContaining(read));
+  });
+
+  it('limits Admissions permissions to school leadership, auditors for read, and Admission Officers', () => {
+    const permissionByKey = new Map(PERMISSION_CATALOG.map((permission) => [permission.key, permission]));
+    const role = (key: string) => BUILT_IN_ROLE_TEMPLATES.find((item) => item.key === key)?.permissionKeys;
+    expect(permissionByKey.get('admissions.read')).toEqual({ key: 'admissions.read', family: 'admissions', scopeKind: 'school', action: 'read', readOnly: true });
+    expect(permissionByKey.get('admissions.manage')).toEqual({ key: 'admissions.manage', family: 'admissions', scopeKind: 'school', action: 'manage', readOnly: false });
+    expect(permissionByKey.get('admissions.convert')).toEqual({ key: 'admissions.convert', family: 'admissions', scopeKind: 'school', action: 'convert', readOnly: false });
+    const all = ['admissions.read', 'admissions.manage', 'admissions.convert'];
+    expect(role('tenant_admin')).toEqual(expect.arrayContaining(all));
+    expect(role('school_admin')).toEqual(expect.arrayContaining(all));
+    expect(role('principal')).toContain('admissions.read');
+    expect(role('principal')).not.toEqual(expect.arrayContaining(['admissions.manage', 'admissions.convert']));
+    expect(role('auditor')).toContain('admissions.read');
+    expect(role('auditor')).not.toEqual(expect.arrayContaining(['admissions.manage', 'admissions.convert']));
+    expect(role('admission_officer')).toEqual(expect.arrayContaining(all));
+    expect(role('admission_officer')).not.toEqual(expect.arrayContaining(['student.manage', 'enrollment.manage']));
   });
 });
