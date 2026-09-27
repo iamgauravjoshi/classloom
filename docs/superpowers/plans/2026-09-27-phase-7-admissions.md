@@ -99,13 +99,13 @@
 - Add an exported `EnrollmentService.admitStudentFromAdmissions(tx, actor, schoolId, input)` contract which requires `admissions.convert` and performs People/Academics/Enrollment validation and creation without requiring broad `student.manage` or `enrollment.manage` grants. Preserve current `admitStudent` authorization and behavior for existing direct-admission routes.
 - Conversion sequence in one tenant transaction: lock accepted case; explicitly resolve/create People profiles and relationships; invoke the Enrollment contract; store student/school/academic enrollment references; set `admitted`; append case event and audit. Any failure rolls back the entire transaction.
 
-- [ ] **Step 1: Write failing service tests** for school permission checks, valid and invalid transitions, bounded decision notes, explicit existing-student link behavior, conversion input validation, and duplicate/stale conversion handling.
-- [ ] **Step 2: Run** `pnpm --filter @classloom/api exec vitest run src/admissions/admissions.service.spec.ts` and confirm expected failures.
-- [ ] **Step 3: Implement AdmissionsService and Enrollment contract**; maintain existing direct admission behavior and require `admissions.convert` for the dedicated contract.
-- [ ] **Step 4: Add the controller/module and register AdmissionsModule**; implement bounded cursor/search/status/session/date filters, including the explicit enquiry-to-draft route, and each lifecycle endpoint from the spec; map domain errors to the existing validation/conflict/not-found envelope.
-- [ ] **Step 5: Run** `pnpm --filter @classloom/api exec vitest run src/admissions/admissions.service.spec.ts src/enrollment/enrollment.service.spec.ts` and confirm service/direct-admission tests pass.
-- [ ] **Step 6: Add E2E tests** for no session, wrong school/tenant, read-only role, Admission Officer lifecycle and conversion access, no broad permissions, all transitions, complete successful conversion, failure rollback, retry/concurrent conversion, and field-specific errors.
-- [ ] **Step 7: Run** `pnpm exec dotenv -e .env -- pnpm --filter @classloom/api test:e2e -- admissions.e2e-spec.ts` and confirm the E2E suite passes.
+- [x] **Step 1: Write failing service tests** for school permission checks, valid and invalid transitions, bounded decision notes, explicit existing-student link behavior, conversion input validation, and duplicate/stale conversion handling.
+- [x] **Step 2: Run** `pnpm --filter @classloom/api exec vitest run src/admissions/admissions.service.spec.ts` and confirm expected failures.
+- [x] **Step 3: Implement AdmissionsService and Enrollment contract**; maintain existing direct admission behavior and require `admissions.convert` for the dedicated contract.
+- [x] **Step 4: Add the controller/module and register AdmissionsModule**; implement bounded cursor/search/status/session/date filters, including the explicit enquiry-to-draft route, and each lifecycle endpoint from the spec; map domain errors to the existing validation/conflict/not-found envelope.
+- [x] **Step 5: Run** `pnpm --filter @classloom/api exec vitest run src/admissions/admissions.service.spec.ts src/enrollment/enrollment.service.spec.ts` and confirm service/direct-admission tests pass.
+- [x] **Step 6: Add E2E tests** for no session, wrong school/tenant, read-only role, Admission Officer lifecycle and conversion access, no broad permissions, all transitions, complete successful conversion, failure rollback, retry/concurrent conversion, and field-specific errors.
+- [x] **Step 7: Run** `pnpm exec dotenv -e .env -- pnpm --filter @classloom/api test:e2e -- admissions.e2e-spec.ts` and confirm the E2E suite passes.
 - [ ] **Step 8: Commit** as `feat: add admissions API workflow`.
 
 ### Task 4: Same-origin web API and Admissions screens

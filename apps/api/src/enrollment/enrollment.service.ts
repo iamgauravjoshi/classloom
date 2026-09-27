@@ -1,4 +1,4 @@
-import { ForbiddenException, Inject, Injectable, Optional } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Inject, Injectable, Optional } from '@nestjs/common';
 import {
   completeAcademicEnrollment,
   createAcademicEnrollment,
@@ -31,6 +31,14 @@ export type StudentAdmissionInput = {
   schoolEnrollment: SchoolEnrollmentInput;
   academicEnrollment: EnrollmentPlacementInput & AcademicEnrollmentInput;
   guardians?: { guardian: GuardianProfileInput; relationship: GuardianRelationshipInput }[];
+};
+
+export type AdmissionsEnrollmentInput = {
+  student?: StudentProfileInput;
+  existingStudentId?: string | null;
+  schoolEnrollment: SchoolEnrollmentInput;
+  academicEnrollment: EnrollmentPlacementInput & AcademicEnrollmentInput;
+  guardians?: { guardian?: GuardianProfileInput; guardianProfileId?: string | null; relationship: GuardianRelationshipInput }[];
 };
 
 const defaultPersistence: EnrollmentPersistence = {
@@ -76,6 +84,32 @@ export class EnrollmentService {
     const guardians = [];
     for (const entry of input.guardians ?? []) {
       const guardian = await this.people.createOrResolveGuardian(tx, actor.tenantId, entry.guardian, audit);
+      const relationship = await this.people.createOrResolveRelationship(tx, actor.tenantId, student.id, guardian.id, entry.relationship, audit);
+      guardians.push({ guardian, relationship });
+    }
+    return { student, schoolEnrollment, academicEnrollment, guardians };
+  }
+
+  /** Narrow conversion contract for Admissions; callers must already hold the case lock in this transaction. */
+  async admitStudentFromAdmissions(tx: TenantTransaction, actor: StudentPeopleActor, schoolId: string, input: AdmissionsEnrollmentInput) {
+    if (!await this.authorization.hasPermissions(actor, ['admissions.convert'], { kind: 'school', schoolId })) {
+      throw new ForbiddenException('Admissions conversion is not allowed for this school');
+    }
+    if (Boolean(input.existingStudentId) === Boolean(input.student)) throw new BadRequestException('Choose either an existing student or new student details');
+    const audit = { actorAccountId: actor.accountId, requestId: actor.requestId };
+    const student = input.existingStudentId
+      ? await this.people.getStudentById(tx, actor.tenantId, input.existingStudentId)
+      : await this.people.createOrResolveStudent(tx, actor.tenantId, input.student!, audit);
+    const schoolEnrollment = await this.persistence.createSchool(tx, { tenantId: actor.tenantId, schoolId }, student.id, input.schoolEnrollment, audit);
+    const { sessionId, classId, sectionId, ...academicValues } = input.academicEnrollment;
+    const placement = await this.academics.requireEnrollmentPlacement(tx, { tenantId: actor.tenantId, schoolId }, { sessionId, classId, sectionId });
+    const academicEnrollment = await this.persistence.createAcademic(tx, { tenantId: actor.tenantId, schoolId }, schoolEnrollment.id, placement, academicValues, audit);
+    const guardians = [];
+    for (const entry of input.guardians ?? []) {
+      if (Boolean(entry.guardianProfileId) === Boolean(entry.guardian)) throw new BadRequestException('Choose either an existing guardian or new guardian details');
+      const guardian = entry.guardianProfileId
+        ? await this.people.getGuardianById(tx, actor.tenantId, entry.guardianProfileId)
+        : await this.people.createOrResolveGuardian(tx, actor.tenantId, entry.guardian!, audit);
       const relationship = await this.people.createOrResolveRelationship(tx, actor.tenantId, student.id, guardian.id, entry.relationship, audit);
       guardians.push({ guardian, relationship });
     }

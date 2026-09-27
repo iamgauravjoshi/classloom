@@ -6,6 +6,8 @@ import {
   findGuardianByCode,
   findStudentGuardianRelationship,
   findStudentByCode,
+  readStudentProfile,
+  readGuardianProfile,
   StudentPeopleError,
   type GuardianProfileInput,
   type GuardianRelationshipInput,
@@ -24,6 +26,8 @@ export interface StudentPeoplePersistence {
   createGuardian: typeof createGuardianProfile;
   createRelationship: typeof createOrUpdateGuardianRelationship;
   findRelationship: typeof findStudentGuardianRelationship;
+  readStudent: typeof readStudentProfile;
+  readGuardian: typeof readGuardianProfile;
 }
 
 const defaultPersistence: StudentPeoplePersistence = {
@@ -33,6 +37,8 @@ const defaultPersistence: StudentPeoplePersistence = {
   createGuardian: createGuardianProfile,
   createRelationship: createOrUpdateGuardianRelationship,
   findRelationship: findStudentGuardianRelationship,
+  readStudent: readStudentProfile,
+  readGuardian: readGuardianProfile,
 };
 
 @Injectable()
@@ -132,5 +138,13 @@ export class StudentPeopleService {
 
   findRelationship(tx: TenantTransaction, tenantId: string, studentId: string, guardianId: string, persistence: StudentPeoplePersistence = defaultPersistence) {
     return persistence.findRelationship(tx, tenantId, studentId, guardianId);
+  }
+
+  getStudentById(tx: TenantTransaction, tenantId: string, studentId: string, persistence: StudentPeoplePersistence = defaultPersistence) {
+    return persistence.readStudent(tx, tenantId, studentId);
+  }
+
+  getGuardianById(tx: TenantTransaction, tenantId: string, guardianId: string, persistence: StudentPeoplePersistence = defaultPersistence) {
+    return persistence.readGuardian(tx, tenantId, guardianId);
   }
 }

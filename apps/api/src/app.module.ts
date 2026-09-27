@@ -9,9 +9,10 @@ import { AuthorizationModule } from './authorization/authorization.module.js';
 import { AcademicsModule } from './academics/academics.module.js';
 import { PeopleModule } from './people/people.module.js';
 import { EnrollmentModule } from './enrollment/enrollment.module.js';
+import { AdmissionsModule } from './admissions/admissions.module.js';
 
 @Module({
-  imports: [DatabaseModule, AuthModule, AuthorizationModule, AcademicsModule, PeopleModule, EnrollmentModule],
+  imports: [DatabaseModule, AuthModule, AuthorizationModule, AcademicsModule, PeopleModule, EnrollmentModule, AdmissionsModule],
   controllers: [HealthController],
   providers: [{ provide: APP_FILTER, useClass: HttpExceptionEnvelopeFilter }],
 })
