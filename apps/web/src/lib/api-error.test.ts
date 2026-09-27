@@ -12,4 +12,9 @@ describe("form feedback", () => {
     expect(validateNewPassword("short")).toMatch(/15 characters/);
     expect(validateNewPassword("🔒".repeat(15))).toBeNull();
   });
+
+  it("keeps safe CSV row errors for import feedback", () => {
+    const error = responseError({ message: "Fix the CSV errors", details: { rows: [{ row: 2, field: "studentCode", message: "Duplicate code" }] } });
+    expect(error.rows).toEqual([{ row: 2, field: "studentCode", message: "Duplicate code" }]);
+  });
 });

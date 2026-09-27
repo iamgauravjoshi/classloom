@@ -2,10 +2,13 @@ import { responseError } from "./api-error";
 
 export const STUDENT_CSV_MAX_BYTES = 2 * 1024 * 1024;
 export type StudentCsvField = "studentCode" | "studentGivenName" | "studentMiddleName" | "studentFamilyName" | "studentPreferredName" | "dateOfBirth" | "studentGender" | "studentEmail" | "studentPhone" | "admissionNumber" | "sessionCode" | "classCode" | "sectionCode" | "rollNumber" | "guardianCode" | "guardianGivenName" | "guardianMiddleName" | "guardianFamilyName" | "guardianPreferredName" | "guardianEmail" | "guardianPhone" | "guardianOccupation" | "guardianAddressLine1" | "guardianAddressLine2" | "guardianCity" | "guardianState" | "guardianPostalCode" | "guardianCountryCode" | "relationshipType";
+export const STUDENT_CSV_FIELDS: readonly StudentCsvField[] = ["studentCode", "studentGivenName", "studentMiddleName", "studentFamilyName", "studentPreferredName", "dateOfBirth", "studentGender", "studentEmail", "studentPhone", "admissionNumber", "sessionCode", "classCode", "sectionCode", "rollNumber", "guardianCode", "guardianGivenName", "guardianMiddleName", "guardianFamilyName", "guardianPreferredName", "guardianEmail", "guardianPhone", "guardianOccupation", "guardianAddressLine1", "guardianAddressLine2", "guardianCity", "guardianState", "guardianPostalCode", "guardianCountryCode", "relationshipType"];
+export const STUDENT_CSV_REQUIRED_FIELDS: readonly StudentCsvField[] = ["studentCode", "studentGivenName", "studentFamilyName", "dateOfBirth", "admissionNumber", "sessionCode", "classCode", "sectionCode"];
+export const STUDENT_CSV_GUARDIAN_REQUIRED_FIELDS: readonly StudentCsvField[] = ["guardianCode", "guardianGivenName", "guardianFamilyName", "relationshipType"];
 export type StudentCsvMapping = Partial<Record<StudentCsvField, string>>;
 export type StudentImportInspection = { headers: string[]; rowCount: number; sampleRows: Record<string, string>[] };
 export type StudentImportError = { row: number; field: StudentCsvField | "file" | "mapping"; message: string };
-export type StudentImportPreview = { rowCount: number; commands: unknown[]; errors: StudentImportError[] };
+export type StudentImportPreview = { rowCount: number; commands: { sourceRows: number[]; student: { studentCode: string; givenName: string; familyName: string }; guardians: unknown[] }[]; errors: StudentImportError[] };
 export type StudentImportResult = { batchId: string; replayed: boolean; studentCount: number; guardianCount: number; enrollmentCount: number };
 
 async function upload<T>(schoolId: string, action: "inspect" | "preview" | "commit", file: File, mapping?: StudentCsvMapping, idempotencyKey?: string): Promise<T> {
