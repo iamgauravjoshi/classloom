@@ -111,7 +111,10 @@ function SidebarContents({ onNavigate }: { onNavigate?: () => void }) {
         <Link href="/admissions" className={`nav-row ${pathname.startsWith("/admissions") ? "nav-row-active" : ""}`} aria-current={pathname.startsWith("/admissions") ? "page" : undefined} onClick={onNavigate}>
           <ClipboardList size={18} /><span>Admissions</span><ChevronRight className="nav-chevron" size={16} />
         </Link>
-        {upcomingSections.filter((section) => !["classes", "teachers", "students", "parents", "attendance"].includes(section.icon)).map((section) => {
+        <Link href="/fees" className={`nav-row ${pathname.startsWith("/fees") ? "nav-row-active" : ""}`} aria-current={pathname.startsWith("/fees") ? "page" : undefined} onClick={onNavigate}>
+          <Wallet size={18} /><span>Fees & Payments</span><ChevronRight className="nav-chevron" size={16} />
+        </Link>
+        {upcomingSections.filter((section) => !["classes", "teachers", "students", "parents", "attendance", "fees"].includes(section.icon)).map((section) => {
           const Icon = sectionIcons[section.icon];
           return (
             <div
