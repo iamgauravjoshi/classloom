@@ -118,6 +118,9 @@ describe.skipIf(!persistenceEnabled)('Phase 8 timetable demo seed persistence', 
 
   afterAll(async () => {
     if (admin) {
+      await admin`delete from weekly_timetable_events where tenant_id = ${tenantId}`;
+      await admin`delete from weekly_timetable_slots where tenant_id = ${tenantId}`;
+      await admin`delete from weekly_timetables where tenant_id = ${tenantId}`;
       await admin`delete from tenants where id = ${tenantId}`;
       await admin`delete from accounts where normalized_email = ${email}`;
       await admin.end();
