@@ -95,6 +95,9 @@ function SidebarContents({ onNavigate }: { onNavigate?: () => void }) {
         <Link href="/timetable" className={`nav-row ${pathname.startsWith("/timetable") ? "nav-row-active" : ""}`} aria-current={pathname.startsWith("/timetable") ? "page" : undefined} onClick={onNavigate}>
           <CalendarDays size={18} /><span>Timetable</span><ChevronRight className="nav-chevron" size={16} />
         </Link>
+        <Link href="/attendance" className={`nav-row ${pathname.startsWith("/attendance") ? "nav-row-active" : ""}`} aria-current={pathname.startsWith("/attendance") ? "page" : undefined} onClick={onNavigate}>
+          <ClipboardCheck size={18} /><span>Attendance</span><ChevronRight className="nav-chevron" size={16} />
+        </Link>
         <Link href="/staff" className={`nav-row ${pathname === "/staff" ? "nav-row-active" : ""}`} aria-current={pathname === "/staff" ? "page" : undefined} onClick={onNavigate}>
           <GraduationCap size={18} /><span>Teachers & Staff</span><ChevronRight className="nav-chevron" size={16} />
         </Link>
@@ -108,7 +111,7 @@ function SidebarContents({ onNavigate }: { onNavigate?: () => void }) {
         <Link href="/admissions" className={`nav-row ${pathname.startsWith("/admissions") ? "nav-row-active" : ""}`} aria-current={pathname.startsWith("/admissions") ? "page" : undefined} onClick={onNavigate}>
           <ClipboardList size={18} /><span>Admissions</span><ChevronRight className="nav-chevron" size={16} />
         </Link>
-        {upcomingSections.filter((section) => !["classes", "teachers", "students", "parents"].includes(section.icon)).map((section) => {
+        {upcomingSections.filter((section) => !["classes", "teachers", "students", "parents", "attendance"].includes(section.icon)).map((section) => {
           const Icon = sectionIcons[section.icon];
           return (
             <div
