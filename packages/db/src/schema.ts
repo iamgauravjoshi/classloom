@@ -810,3 +810,73 @@ export const weeklyTimetableEvents = pgTable('weekly_timetable_events', {
   check('weekly_timetable_events_type_check', sql`${table.eventType} in ('created', 'slot_created', 'slot_updated', 'slot_deleted', 'published')`),
   tenantPolicy(table),
 ]).enableRLS();
+
+export const dailyAttendanceRegisters = pgTable('daily_attendance_registers', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  schoolId: uuid('school_id').notNull(),
+  sessionId: uuid('session_id').notNull(),
+  sectionId: uuid('section_id').notNull(),
+  attendanceDate: date('attendance_date').notNull(),
+  createdByAccountId: uuid('created_by_account_id').notNull(),
+  createdByMembershipId: uuid('created_by_membership_id').notNull(),
+  updatedByAccountId: uuid('updated_by_account_id').notNull(),
+  updatedByMembershipId: uuid('updated_by_membership_id').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.tenantId, table.schoolId], foreignColumns: [schools.tenantId, schools.id], name: 'daily_attendance_registers_school_fk' }).onDelete('cascade'),
+  foreignKey({ columns: [table.tenantId, table.schoolId, table.sessionId], foreignColumns: [academicSessions.tenantId, academicSessions.schoolId, academicSessions.id], name: 'daily_attendance_registers_session_fk' }).onDelete('restrict'),
+  foreignKey({ columns: [table.tenantId, table.schoolId, table.sessionId, table.sectionId], foreignColumns: [academicSections.tenantId, academicSections.schoolId, academicSections.sessionId, academicSections.id], name: 'daily_attendance_registers_section_fk' }).onDelete('restrict'),
+  foreignKey({ columns: [table.tenantId, table.createdByMembershipId], foreignColumns: [memberships.tenantId, memberships.id], name: 'daily_attendance_registers_created_membership_fk' }).onDelete('restrict'),
+  foreignKey({ columns: [table.tenantId, table.updatedByMembershipId], foreignColumns: [memberships.tenantId, memberships.id], name: 'daily_attendance_registers_updated_membership_fk' }).onDelete('restrict'),
+  foreignKey({ columns: [table.createdByAccountId, table.createdByMembershipId], foreignColumns: [memberships.accountId, memberships.id], name: 'daily_attendance_registers_created_actor_fk' }).onDelete('restrict'),
+  foreignKey({ columns: [table.updatedByAccountId, table.updatedByMembershipId], foreignColumns: [memberships.accountId, memberships.id], name: 'daily_attendance_registers_updated_actor_fk' }).onDelete('restrict'),
+  unique('daily_attendance_registers_scope_id_unique').on(table.tenantId, table.schoolId, table.id),
+  uniqueIndex('daily_attendance_registers_daily_unique').on(table.tenantId, table.schoolId, table.sessionId, table.sectionId, table.attendanceDate),
+  index('daily_attendance_registers_date_section_idx').on(table.tenantId, table.schoolId, table.attendanceDate, table.sessionId, table.sectionId),
+  tenantPolicy(table),
+]).enableRLS();
+
+export const dailyAttendanceEntries = pgTable('daily_attendance_entries', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  schoolId: uuid('school_id').notNull(),
+  registerId: uuid('register_id').notNull(),
+  academicEnrollmentId: uuid('academic_enrollment_id').notNull(),
+  status: text('status').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.tenantId, table.schoolId, table.registerId], foreignColumns: [dailyAttendanceRegisters.tenantId, dailyAttendanceRegisters.schoolId, dailyAttendanceRegisters.id], name: 'daily_attendance_entries_register_fk' }).onDelete('cascade'),
+  foreignKey({ columns: [table.tenantId, table.schoolId, table.academicEnrollmentId], foreignColumns: [studentAcademicEnrollments.tenantId, studentAcademicEnrollments.schoolId, studentAcademicEnrollments.id], name: 'daily_attendance_entries_enrollment_fk' }).onDelete('restrict'),
+  unique('daily_attendance_entries_scope_id_unique').on(table.tenantId, table.schoolId, table.id),
+  unique('daily_attendance_entries_register_enrollment_unique').on(table.tenantId, table.schoolId, table.registerId, table.academicEnrollmentId),
+  index('daily_attendance_entries_enrollment_idx').on(table.tenantId, table.schoolId, table.academicEnrollmentId),
+  check('daily_attendance_entries_status_check', sql`${table.status} in ('present', 'absent', 'late', 'excused')`),
+  tenantPolicy(table),
+]).enableRLS();
+
+export const dailyAttendanceEvents = pgTable('daily_attendance_events', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  schoolId: uuid('school_id').notNull(),
+  registerId: uuid('register_id').notNull(),
+  academicEnrollmentId: uuid('academic_enrollment_id').notNull(),
+  actorAccountId: uuid('actor_account_id').notNull(),
+  actorMembershipId: uuid('actor_membership_id').notNull(),
+  requestId: text('request_id').notNull(),
+  previousStatus: text('previous_status'),
+  status: text('status').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.tenantId, table.schoolId, table.registerId], foreignColumns: [dailyAttendanceRegisters.tenantId, dailyAttendanceRegisters.schoolId, dailyAttendanceRegisters.id], name: 'daily_attendance_events_register_fk' }).onDelete('cascade'),
+  foreignKey({ columns: [table.tenantId, table.schoolId, table.registerId, table.academicEnrollmentId], foreignColumns: [dailyAttendanceEntries.tenantId, dailyAttendanceEntries.schoolId, dailyAttendanceEntries.registerId, dailyAttendanceEntries.academicEnrollmentId], name: 'daily_attendance_events_entry_fk' }).onDelete('cascade'),
+  foreignKey({ columns: [table.tenantId, table.actorMembershipId], foreignColumns: [memberships.tenantId, memberships.id], name: 'daily_attendance_events_actor_membership_fk' }).onDelete('restrict'),
+  foreignKey({ columns: [table.actorAccountId, table.actorMembershipId], foreignColumns: [memberships.accountId, memberships.id], name: 'daily_attendance_events_actor_account_membership_fk' }).onDelete('restrict'),
+  uniqueIndex('daily_attendance_events_scope_id_unique').on(table.tenantId, table.schoolId, table.id),
+  index('daily_attendance_events_register_created_idx').on(table.tenantId, table.schoolId, table.registerId, table.createdAt, table.id),
+  check('daily_attendance_events_status_check', sql`${table.status} in ('present', 'absent', 'late', 'excused')`),
+  check('daily_attendance_events_previous_status_check', sql`${table.previousStatus} is null or ${table.previousStatus} in ('present', 'absent', 'late', 'excused')`),
+  tenantPolicy(table),
+]).enableRLS();

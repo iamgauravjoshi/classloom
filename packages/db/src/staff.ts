@@ -405,6 +405,14 @@ export async function isAssignableTeacher(tx: TenantTransaction, scope: StaffSco
   return Boolean(record) && await activeMemberAtSchool(tx, scope, membershipId);
 }
 
+export async function getAttendanceTeacherLink(tx: TenantTransaction, scope: StaffScope, membershipId: string) {
+  const [profile] = await tx.select({ id: staffProfiles.id }).from(staffProfiles).where(and(
+    eq(staffProfiles.tenantId, scope.tenantId), eq(staffProfiles.membershipId, membershipId),
+  )).limit(1);
+  if (!profile) return { linked: false, eligible: false };
+  return { linked: true, eligible: await isAssignableTeacher(tx, scope, membershipId) };
+}
+
 export async function listAssignableTeacherAccounts(tx: TenantTransaction, scope: StaffScope) {
   return tx.selectDistinct({
     id: memberships.id,

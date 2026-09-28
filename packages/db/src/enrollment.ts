@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import type { EnrollmentPlacementInput } from './academics.js';
 import type { TenantTransaction } from './client.js';
 import { lockActiveStudentGuardiansForScope, lockStudentForScope } from './students.js';
@@ -335,6 +335,35 @@ export async function listAcademicEnrollmentHistory(tx: TenantTransaction, scope
     eq(studentAcademicEnrollments.tenantId, scope.tenantId), eq(studentAcademicEnrollments.schoolId, scope.schoolId),
     eq(studentAcademicEnrollments.schoolEnrollmentId, schoolEnrollmentId),
   )).orderBy(asc(studentAcademicEnrollments.startDate), asc(studentAcademicEnrollments.id));
+}
+
+export async function listAttendanceRoster(
+  tx: TenantTransaction,
+  scope: EnrollmentScope,
+  sessionId: string,
+  sectionId: string,
+  date: string,
+) {
+  return tx.select({
+    academicEnrollmentId: studentAcademicEnrollments.id,
+    studentId: studentAcademicEnrollments.studentId,
+    rollNumber: studentAcademicEnrollments.rollNumber,
+    displayName: sql<string>`concat_ws(' ', coalesce(${studentProfiles.preferredName}, ${studentProfiles.givenName}), ${studentProfiles.familyName})`,
+  }).from(studentAcademicEnrollments)
+    .innerJoin(studentProfiles, and(
+      eq(studentProfiles.tenantId, studentAcademicEnrollments.tenantId),
+      eq(studentProfiles.id, studentAcademicEnrollments.studentId),
+    ))
+    .where(and(
+      eq(studentAcademicEnrollments.tenantId, scope.tenantId),
+      eq(studentAcademicEnrollments.schoolId, scope.schoolId),
+      eq(studentAcademicEnrollments.sessionId, sessionId),
+      eq(studentAcademicEnrollments.sectionId, sectionId),
+      lte(studentAcademicEnrollments.startDate, date),
+      or(isNull(studentAcademicEnrollments.endDate), gte(studentAcademicEnrollments.endDate, date)),
+      eq(studentProfiles.status, 'active'),
+    ))
+    .orderBy(asc(studentAcademicEnrollments.rollNumber), asc(studentProfiles.familyName), asc(studentProfiles.givenName), asc(studentAcademicEnrollments.id));
 }
 
 export async function listActiveStudentSchoolIds(tx: TenantTransaction, tenantId: string, studentId: string) {

@@ -36,6 +36,9 @@ export {
   weeklyTimetableEvents,
   weeklyTimetableSlots,
   weeklyTimetables,
+  dailyAttendanceRegisters,
+  dailyAttendanceEntries,
+  dailyAttendanceEvents,
   guardianProfiles,
   teacherProfiles,
   tenants,
@@ -58,6 +61,7 @@ export {
   unlinkStaffMembership,
   listEligibleStaffAccounts,
   isAssignableTeacher,
+  getAttendanceTeacherLink,
   listAssignableTeacherAccounts,
 } from './staff.js';
 export type { StaffScope, StaffProfileInput, StaffAffiliationInput, StaffCreateInput, StaffListFilters, StaffListPage, StaffRecord, StaffAudit } from './staff.js';
@@ -131,6 +135,7 @@ export {
   findActiveSchoolEnrollment,
   findActiveAcademicEnrollment,
   listAcademicEnrollmentHistory,
+  listAttendanceRoster,
   listActiveStudentSchoolIds,
   listActiveGuardianSchoolIds,
   listSchoolStudentIds,
@@ -188,6 +193,25 @@ export {
 } from './authorization-repository.js';
 export type { AuthorizationScope, AuthorizationGrant } from './authorization-repository.js';
 export { listTenantAuthorizationRoles, bootstrapTenantAdmin } from './authorization-repository.js';
+
+export {
+  AttendanceError,
+  calculateAttendanceCompletion,
+  changedAttendanceEntries,
+  normalizeAttendanceRegisterInput,
+  readDailyAttendance,
+  saveDailyAttendance,
+  listDailyAttendanceEvents,
+} from './attendance.js';
+export type {
+  AttendanceActor,
+  AttendanceCompletion,
+  AttendanceEntryInput,
+  AttendanceRegisterInput,
+  AttendanceRosterStudent,
+  AttendanceScope,
+  AttendanceStatus,
+} from './attendance.js';
 export {
   AdmissionError,
   nextAdmissionStatus,

@@ -8,7 +8,7 @@ import { createAccountWithMembership } from './identity-repository.js';
 import { provisionTenant } from './provisioning.js';
 import { academicTeacherAssignments, securityEvents, staffProfiles } from './schema.js';
 import {
-  addStaffAffiliation, createStaffProfile, isAssignableTeacher, linkStaffMembership,
+  addStaffAffiliation, createStaffProfile, getAttendanceTeacherLink, isAssignableTeacher, linkStaffMembership,
   listAssignableTeacherAccounts,
   listEligibleStaffAccounts, listSchoolStaff, readSchoolStaff, StaffError,
   unlinkStaffMembership, updateStaffAffiliation, updateStaffProfile, upsertTeacherProfile,
@@ -121,6 +121,10 @@ describe.skipIf(!enabled)('staff directory persistence', () => {
     await expect(withTenantContext(runtime.db, tenantId, (tx) => linkStaffMembership(tx, scope, person.id, noGrantMembershipId, { actorAccountId }))).rejects.toMatchObject({ code: 'INVALID' });
     const linked = await withTenantContext(runtime.db, tenantId, (tx) => linkStaffMembership(tx, scope, person.id, actorMembershipId, { actorAccountId }));
     expect(linked.membershipId).toBe(actorMembershipId);
+    expect(await withTenantContext(runtime.db, tenantId, (tx) => getAttendanceTeacherLink(tx, scope, noGrantMembershipId)))
+      .toEqual({ linked: false, eligible: false });
+    expect(await withTenantContext(runtime.db, tenantId, (tx) => getAttendanceTeacherLink(tx, scope, actorMembershipId)))
+      .toEqual({ linked: true, eligible: true });
     expect(await withTenantContext(runtime.db, tenantId, (tx) => isAssignableTeacher(tx, scope, actorMembershipId))).toBe(true);
     await admin`update accounts set status = 'disabled' where normalized_email = ${actorEmail}`;
     expect(await withTenantContext(runtime.db, tenantId, (tx) => isAssignableTeacher(tx, scope, actorMembershipId))).toBe(false);
@@ -144,6 +148,8 @@ describe.skipIf(!enabled)('staff directory persistence', () => {
     expect(await withTenantContext(runtime.db, tenantId, (tx) => isAssignableTeacher(tx, { tenantId, schoolId: secondSchoolId }, actorMembershipId))).toBe(true);
     await withTenantContext(runtime.db, tenantId, (tx) => updateStaffAffiliation(tx, scope, person.id, { status: 'inactive' }, { actorAccountId }));
     expect(await withTenantContext(runtime.db, tenantId, (tx) => isAssignableTeacher(tx, scope, actorMembershipId))).toBe(false);
+    expect(await withTenantContext(runtime.db, tenantId, (tx) => getAttendanceTeacherLink(tx, scope, actorMembershipId)))
+      .toEqual({ linked: true, eligible: false });
     await withTenantContext(runtime.db, tenantId, (tx) => updateStaffAffiliation(tx, scope, person.id, { status: 'active' }, { actorAccountId }));
     expect(await withTenantContext(runtime.db, tenantId, (tx) => isAssignableTeacher(tx, scope, actorMembershipId))).toBe(true);
     expect((await withTenantContext(runtime.db, tenantId, (tx) => listEligibleStaffAccounts(tx, scope))).map((item) => item.id)).not.toContain(actorMembershipId);
