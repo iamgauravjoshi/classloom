@@ -77,9 +77,9 @@ export function AdmissionsClient() {
     {loadingSchools ? <Skeleton className="h-64 w-full" aria-label="Loading schools" /> : schools.length === 0 ? <Alert><AlertTitle>No admissions access</AlertTitle><AlertDescription>Your active workspace does not have access to admissions at a school.</AlertDescription></Alert> : <Card>
       <CardHeader><CardTitle>Admissions worklist</CardTitle><CardDescription>Search cases, narrow by stage or requested session, and open a record to continue processing.</CardDescription></CardHeader>
       <CardContent className="flex flex-col gap-5">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7">
           <DirectorySelect id={schoolControlId} label="School" value={schoolId} options={schools} onChange={resetFilters} emptyLabel="Choose school" />
-          <Field><FieldLabel htmlFor="admission-search">Search cases</FieldLabel><div className="relative"><Search aria-hidden="true" className="absolute left-2 top-2 size-4 text-muted-foreground" /><Input id="admission-search" className="pl-8" value={query} onChange={(event) => { setQuery(event.target.value); resetCursor(); }} placeholder="Name or case number" /></div></Field>
+          <Field className="xl:col-span-2"><FieldLabel htmlFor="admission-search">Search cases</FieldLabel><div className="relative"><Search aria-hidden="true" className="absolute left-2 top-2 size-4 text-muted-foreground" /><Input id="admission-search" className="pl-8" value={query} onChange={(event) => { setQuery(event.target.value); resetCursor(); }} placeholder="Name or case number" /></div></Field>
           <DirectorySelect id={statusControlId} label="Status" value={status} options={statuses.map((value) => ({ id: value, name: value.replaceAll('_', ' ') }))} onChange={(value) => { setStatus(value); resetCursor(); }} emptyLabel="All statuses" />
           <DirectorySelect id={sessionControlId} label="Requested session" value={sessionId} options={sessions.map((item) => ({ id: item.id, name: item.name }))} onChange={(value) => { setSessionId(value); resetCursor(); }} emptyLabel="All sessions" />
           <DateField id="created-from" label="Created from" value={createdFrom} onChange={(value) => { setCreatedFrom(value); resetCursor(); }} required={false} />

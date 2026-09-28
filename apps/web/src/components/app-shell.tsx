@@ -21,6 +21,7 @@ import {
   ClipboardList,
   School,
   Settings2,
+  CalendarDays,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -90,6 +91,9 @@ function SidebarContents({ onNavigate }: { onNavigate?: () => void }) {
         <p className="nav-caption nav-caption-spaced">ACADEMIC</p>
         <Link href="/academic-setup" className={`nav-row ${pathname === "/academic-setup" ? "nav-row-active" : ""}`} aria-current={pathname === "/academic-setup" ? "page" : undefined} onClick={onNavigate}>
           <School size={18} /><span>Academic Setup</span><ChevronRight className="nav-chevron" size={16} />
+        </Link>
+        <Link href="/timetable" className={`nav-row ${pathname.startsWith("/timetable") ? "nav-row-active" : ""}`} aria-current={pathname.startsWith("/timetable") ? "page" : undefined} onClick={onNavigate}>
+          <CalendarDays size={18} /><span>Timetable</span><ChevronRight className="nav-chevron" size={16} />
         </Link>
         <Link href="/staff" className={`nav-row ${pathname === "/staff" ? "nav-row-active" : ""}`} aria-current={pathname === "/staff" ? "page" : undefined} onClick={onNavigate}>
           <GraduationCap size={18} /><span>Teachers & Staff</span><ChevronRight className="nav-chevron" size={16} />

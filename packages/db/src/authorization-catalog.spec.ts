@@ -86,4 +86,17 @@ describe('authorization catalog', () => {
     expect(role('admission_officer')).toEqual(expect.arrayContaining(all));
     expect(role('admission_officer')).not.toEqual(expect.arrayContaining(['student.manage', 'enrollment.manage']));
   });
+
+  it('grants timetable management to school administrators and read access to teaching and audit roles', () => {
+    const permissionByKey = new Map(PERMISSION_CATALOG.map((permission) => [permission.key, permission]));
+    const role = (key: string) => BUILT_IN_ROLE_TEMPLATES.find((item) => item.key === key)?.permissionKeys;
+    expect(permissionByKey.get('timetable.read')).toEqual({ key: 'timetable.read', family: 'timetable', scopeKind: 'school', action: 'read', readOnly: true });
+    expect(permissionByKey.get('timetable.manage')).toEqual({ key: 'timetable.manage', family: 'timetable', scopeKind: 'school', action: 'manage', readOnly: false });
+    expect(role('tenant_admin')).toEqual(expect.arrayContaining(['timetable.read', 'timetable.manage']));
+    expect(role('school_admin')).toEqual(expect.arrayContaining(['timetable.read', 'timetable.manage']));
+    for (const key of ['principal', 'teacher', 'auditor']) expect(role(key)).toContain('timetable.read');
+    expect(role('principal')).not.toContain('timetable.manage');
+    expect(role('teacher')).not.toContain('timetable.manage');
+    expect(role('auditor')).not.toContain('timetable.manage');
+  });
 });

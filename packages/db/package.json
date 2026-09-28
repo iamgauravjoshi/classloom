@@ -11,6 +11,7 @@
     "setup-runtime-role": "tsx src/setup-runtime-role.ts",
     "provision-tenant": "tsx src/provision-tenant.ts",
     "seed-phase6-demo": "tsx src/seed-phase6-demo.ts",
+    "seed-phase8-demo": "tsx src/seed-phase8-demo.ts",
     "check": "tsx src/check.ts",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",

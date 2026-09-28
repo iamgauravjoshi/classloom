@@ -37,7 +37,7 @@ describe.skipIf(!provisionerUrl || !runtimeUrl)('authorization seeding', () => {
     await withTenantContext(runtime.db, tenantId, (tx) => seedTenantAuthorization(tx, tenantId));
 
     const roles = await withTenantContext(runtime.db, tenantId, (tx) =>
-      tx.select({ key: authorizationRoles.key, systemKey: authorizationRoles.systemKey }).from(authorizationRoles),
+      tx.select({ id: authorizationRoles.id, key: authorizationRoles.key, systemKey: authorizationRoles.systemKey }).from(authorizationRoles),
     );
     const permissions = await withTenantContext(runtime.db, tenantId, (tx) =>
       tx.select({ roleId: authorizationRolePermissions.roleId, permissionKey: authorizationRolePermissions.permissionKey })
@@ -48,6 +48,15 @@ describe.skipIf(!provisionerUrl || !runtimeUrl)('authorization seeding', () => {
     expect(roles.every(({ key, systemKey }) => key === systemKey)).toBe(true);
     expect(permissions).toHaveLength(BUILT_IN_ROLE_TEMPLATES.reduce((count, role) => count + role.permissionKeys.length, 0));
     expect(permissions.length).toBeGreaterThanOrEqual(PERMISSION_CATALOG.length);
+    const rolePermissions = new Map<string, Set<string>>();
+    for (const { id, systemKey } of roles) {
+      if (systemKey) rolePermissions.set(systemKey, new Set(permissions.filter((permission) => permission.roleId === id).map(({ permissionKey }) => permissionKey)));
+    }
+    for (const roleKey of ['tenant_admin', 'school_admin']) {
+      expect(rolePermissions.get(roleKey)?.has('timetable.read')).toBe(true);
+      expect(rolePermissions.get(roleKey)?.has('timetable.manage')).toBe(true);
+    }
+    for (const roleKey of ['principal', 'teacher', 'auditor']) expect(rolePermissions.get(roleKey)?.has('timetable.read')).toBe(true);
   });
 
   it('seeds permission catalog and roles for a tenant that existed before the seed migration', async () => {
