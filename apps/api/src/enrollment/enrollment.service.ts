@@ -6,6 +6,9 @@ import {
   transferAcademicEnrollment,
   withdrawAcademicEnrollment,
   listAttendanceRoster,
+  lockFinanceEnrollment,
+  listFinanceEnrollments,
+  hasFinancePlacement,
   type AcademicEnrollmentInput,
   type EnrollmentCloseInput,
   type EnrollmentPlacementInput,
@@ -78,6 +81,18 @@ export class EnrollmentService {
 
   listAttendanceRoster(tx: TenantTransaction, scope: { tenantId: string; schoolId: string }, sessionId: string, sectionId: string, date: string) {
     return this.attendanceRosterReader(tx, scope, sessionId, sectionId, date);
+  }
+
+  lockFinanceEnrollment(tx: TenantTransaction, scope: { tenantId: string; schoolId: string }, schoolEnrollmentId: string) {
+    return lockFinanceEnrollment(tx, scope, schoolEnrollmentId);
+  }
+
+  listFinanceEnrollments(tx: TenantTransaction, scope: { tenantId: string; schoolId: string }) {
+    return listFinanceEnrollments(tx, scope);
+  }
+
+  hasFinancePlacement(tx: TenantTransaction, scope: { tenantId: string; schoolId: string }, schoolEnrollmentId: string, sessionId: string, classId: string) {
+    return hasFinancePlacement(tx, scope, schoolEnrollmentId, sessionId, classId);
   }
 
   async admitStudent(tx: TenantTransaction, actor: StudentPeopleActor, schoolId: string, input: StudentAdmissionInput) {

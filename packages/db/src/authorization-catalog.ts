@@ -27,6 +27,7 @@ export const PERMISSION_CATALOG = [
   { key: 'marks.enter', family: 'marks', scopeKind: 'academic', action: 'enter', readOnly: false },
   { key: 'results.publish', family: 'results', scopeKind: 'academic', action: 'publish', readOnly: false },
   { key: 'finance.read', family: 'finance', scopeKind: 'school', action: 'read', readOnly: true },
+  { key: 'finance.manage', family: 'finance', scopeKind: 'school', action: 'manage', readOnly: false },
   { key: 'payments.record', family: 'payments', scopeKind: 'school', action: 'record', readOnly: false },
   { key: 'payments.adjust', family: 'payments', scopeKind: 'school', action: 'adjust', readOnly: false },
   { key: 'reports.export', family: 'reports', scopeKind: 'tenant', action: 'export', readOnly: false },
@@ -49,7 +50,7 @@ export const BUILT_IN_ROLE_TEMPLATES = [
       'admissions.read', 'admissions.manage', 'admissions.convert',
       'timetable.read', 'timetable.manage',
       'attendance.read', 'attendance.record', 'marks.read', 'marks.enter',
-      'results.publish', 'finance.read', 'payments.record', 'payments.adjust', 'reports.export',
+      'results.publish', 'finance.read', 'finance.manage', 'payments.record', 'payments.adjust', 'reports.export',
     ],
   },
   {
@@ -70,7 +71,7 @@ export const BUILT_IN_ROLE_TEMPLATES = [
   },
   {
     key: 'finance_operator', name: 'Finance operator',
-    permissionKeys: ['school.read', 'finance.read', 'payments.record'],
+    permissionKeys: ['school.read', 'finance.read', 'finance.manage', 'payments.record'],
   },
   {
     key: 'auditor', name: 'Auditor',

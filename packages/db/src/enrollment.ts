@@ -13,6 +13,35 @@ import {
 } from './schema.js';
 
 export type EnrollmentScope = { tenantId: string; schoolId: string };
+
+/** Finance contract: lock one school account before changing its receivables. */
+export async function lockFinanceEnrollment(tx: TenantTransaction, scope: EnrollmentScope, schoolEnrollmentId: string) {
+  const [enrollment] = await tx.select().from(studentSchoolEnrollments).where(and(
+    eq(studentSchoolEnrollments.tenantId, scope.tenantId), eq(studentSchoolEnrollments.schoolId, scope.schoolId),
+    eq(studentSchoolEnrollments.id, schoolEnrollmentId),
+  )).for('update').limit(1);
+  if (!enrollment) throw new EnrollmentError('NOT_FOUND', 'Student school enrollment was not found');
+  return enrollment;
+}
+
+export async function listFinanceEnrollments(tx: TenantTransaction, scope: EnrollmentScope) {
+  return tx.select({ id: studentSchoolEnrollments.id, studentId: studentSchoolEnrollments.studentId,
+    admissionNumber: studentSchoolEnrollments.admissionNumber, status: studentSchoolEnrollments.status,
+    givenName: studentProfiles.givenName, familyName: studentProfiles.familyName })
+    .from(studentSchoolEnrollments).innerJoin(studentProfiles, and(
+      eq(studentProfiles.tenantId, studentSchoolEnrollments.tenantId), eq(studentProfiles.id, studentSchoolEnrollments.studentId),
+    )).where(and(eq(studentSchoolEnrollments.tenantId, scope.tenantId), eq(studentSchoolEnrollments.schoolId, scope.schoolId)))
+    .orderBy(asc(studentProfiles.familyName), asc(studentProfiles.givenName));
+}
+
+export async function hasFinancePlacement(tx: TenantTransaction, scope: EnrollmentScope, schoolEnrollmentId: string, sessionId: string, classId: string) {
+  const [placement] = await tx.select({ id: studentAcademicEnrollments.id }).from(studentAcademicEnrollments).where(and(
+    eq(studentAcademicEnrollments.tenantId, scope.tenantId), eq(studentAcademicEnrollments.schoolId, scope.schoolId),
+    eq(studentAcademicEnrollments.schoolEnrollmentId, schoolEnrollmentId), eq(studentAcademicEnrollments.sessionId, sessionId),
+    eq(studentAcademicEnrollments.classId, classId), eq(studentAcademicEnrollments.status, 'active'),
+  )).limit(1);
+  return Boolean(placement);
+}
 export type EnrollmentAudit = { actorAccountId: string; requestId?: string };
 export type SchoolEnrollmentInput = { admissionNumber: string; admissionDate: string };
 export type AcademicEnrollmentInput = { rollNumber?: string | null; startDate: string };

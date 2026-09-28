@@ -91,6 +91,22 @@ export class AcademicsService {
     return setup.sessions.map(({ id, name, code, startDate, endDate, status }) => ({ id, name, code, startDate, endDate, status }));
   }
 
+  async requireFinancePlanClass(tx: TenantTransaction, scope: AcademicScope, sessionId: string, classId: string) {
+    const setup = await this.setupReader(tx, scope);
+    const session = setup.sessions.find((item) => item.id === sessionId);
+    const academicClass = setup.classes.find((item) => item.id === classId && item.sessionId === sessionId);
+    if (!session || !academicClass) throw new AcademicSetupError('NOT_FOUND', 'Academic class was not found in this school and session');
+    return { session, academicClass };
+  }
+
+  async listFinanceOptions(tx: TenantTransaction, scope: AcademicScope) {
+    const setup = await this.setupReader(tx, scope);
+    return {
+      sessions: setup.sessions.map(({ id, name, startDate, endDate, status }) => ({ id, name, startDate, endDate, status })),
+      classes: setup.classes.map(({ id, sessionId, name }) => ({ id, sessionId, name })),
+    };
+  }
+
   async requireTimetableAssignment(
     tx: TenantTransaction,
     scope: AcademicScope,

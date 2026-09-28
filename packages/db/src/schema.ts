@@ -3,6 +3,7 @@ import {
   foreignKey,
   index,
   boolean,
+  bigint,
   check,
   date,
   integer,
@@ -878,5 +879,160 @@ export const dailyAttendanceEvents = pgTable('daily_attendance_events', {
   index('daily_attendance_events_register_created_idx').on(table.tenantId, table.schoolId, table.registerId, table.createdAt, table.id),
   check('daily_attendance_events_status_check', sql`${table.status} in ('present', 'absent', 'late', 'excused')`),
   check('daily_attendance_events_previous_status_check', sql`${table.previousStatus} is null or ${table.previousStatus} in ('present', 'absent', 'late', 'excused')`),
+  tenantPolicy(table),
+]).enableRLS();
+
+// Finance stores exact minor units. Issued charges and journal entries are append-only.
+export const feeHeads = pgTable('fee_heads', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  schoolId: uuid('school_id').notNull(),
+  code: text('code').notNull(),
+  name: text('name').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.tenantId, table.schoolId], foreignColumns: [schools.tenantId, schools.id], name: 'fee_heads_school_fk' }).onDelete('restrict'),
+  unique('fee_heads_scope_id_unique').on(table.tenantId, table.schoolId, table.id),
+  uniqueIndex('fee_heads_code_unique').on(table.tenantId, table.schoolId, sql`upper(trim(${table.code}))`),
+  tenantPolicy(table),
+]).enableRLS();
+
+export const feePlans = pgTable('fee_plans', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  schoolId: uuid('school_id').notNull(),
+  sessionId: uuid('session_id').notNull(),
+  classId: uuid('class_id').notNull(),
+  name: text('name').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.tenantId, table.schoolId, table.sessionId, table.classId], foreignColumns: [academicClasses.tenantId, academicClasses.schoolId, academicClasses.sessionId, academicClasses.id], name: 'fee_plans_class_fk' }).onDelete('restrict'),
+  unique('fee_plans_scope_id_unique').on(table.tenantId, table.schoolId, table.id),
+  uniqueIndex('fee_plans_name_unique').on(table.tenantId, table.schoolId, table.sessionId, table.classId, sql`upper(trim(${table.name}))`),
+  tenantPolicy(table),
+]).enableRLS();
+
+export const feePlanLines = pgTable('fee_plan_lines', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  schoolId: uuid('school_id').notNull(),
+  planId: uuid('plan_id').notNull(),
+  headId: uuid('head_id').notNull(),
+  label: text('label').notNull(),
+  dueDate: date('due_date').notNull(),
+  amountMinor: bigint('amount_minor', { mode: 'bigint' }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.tenantId, table.schoolId, table.planId], foreignColumns: [feePlans.tenantId, feePlans.schoolId, feePlans.id], name: 'fee_plan_lines_plan_fk' }).onDelete('restrict'),
+  foreignKey({ columns: [table.tenantId, table.schoolId, table.headId], foreignColumns: [feeHeads.tenantId, feeHeads.schoolId, feeHeads.id], name: 'fee_plan_lines_head_fk' }).onDelete('restrict'),
+  unique('fee_plan_lines_scope_id_unique').on(table.tenantId, table.schoolId, table.id),
+  unique('fee_plan_lines_plan_scope_id_unique').on(table.tenantId, table.schoolId, table.planId, table.id),
+  check('fee_plan_lines_amount_check', sql`${table.amountMinor} > 0`),
+  tenantPolicy(table),
+]).enableRLS();
+
+export const feeAssignments = pgTable('fee_assignments', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  schoolId: uuid('school_id').notNull(),
+  planId: uuid('plan_id').notNull(),
+  schoolEnrollmentId: uuid('school_enrollment_id').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.tenantId, table.schoolId, table.planId], foreignColumns: [feePlans.tenantId, feePlans.schoolId, feePlans.id], name: 'fee_assignments_plan_fk' }).onDelete('restrict'),
+  foreignKey({ columns: [table.tenantId, table.schoolId, table.schoolEnrollmentId], foreignColumns: [studentSchoolEnrollments.tenantId, studentSchoolEnrollments.schoolId, studentSchoolEnrollments.id], name: 'fee_assignments_enrollment_fk' }).onDelete('restrict'),
+  unique('fee_assignments_scope_id_unique').on(table.tenantId, table.schoolId, table.id),
+  unique('fee_assignments_plan_enrollment_scope_id_unique').on(table.tenantId, table.schoolId, table.planId, table.schoolEnrollmentId, table.id),
+  uniqueIndex('fee_assignments_plan_enrollment_unique').on(table.tenantId, table.schoolId, table.planId, table.schoolEnrollmentId),
+  tenantPolicy(table),
+]).enableRLS();
+
+export const feeCharges = pgTable('fee_charges', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  schoolId: uuid('school_id').notNull(),
+  assignmentId: uuid('assignment_id').notNull(),
+  planId: uuid('plan_id').notNull(),
+  planLineId: uuid('plan_line_id').notNull(),
+  schoolEnrollmentId: uuid('school_enrollment_id').notNull(),
+  description: text('description').notNull(),
+  currency: text('currency').notNull(),
+  dueDate: date('due_date').notNull(),
+  amountMinor: bigint('amount_minor', { mode: 'bigint' }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.tenantId, table.schoolId, table.planId, table.schoolEnrollmentId, table.assignmentId], foreignColumns: [feeAssignments.tenantId, feeAssignments.schoolId, feeAssignments.planId, feeAssignments.schoolEnrollmentId, feeAssignments.id], name: 'fee_charges_assignment_fk' }).onDelete('restrict'),
+  foreignKey({ columns: [table.tenantId, table.schoolId, table.planId, table.planLineId], foreignColumns: [feePlanLines.tenantId, feePlanLines.schoolId, feePlanLines.planId, feePlanLines.id], name: 'fee_charges_line_fk' }).onDelete('restrict'),
+  foreignKey({ columns: [table.tenantId, table.schoolId, table.schoolEnrollmentId], foreignColumns: [studentSchoolEnrollments.tenantId, studentSchoolEnrollments.schoolId, studentSchoolEnrollments.id], name: 'fee_charges_enrollment_fk' }).onDelete('restrict'),
+  unique('fee_charges_scope_id_unique').on(table.tenantId, table.schoolId, table.id),
+  unique('fee_charges_enrollment_scope_id_unique').on(table.tenantId, table.schoolId, table.schoolEnrollmentId, table.id),
+  uniqueIndex('fee_charges_assignment_line_unique').on(table.tenantId, table.schoolId, table.assignmentId, table.planLineId),
+  index('fee_charges_enrollment_idx').on(table.tenantId, table.schoolId, table.schoolEnrollmentId),
+  check('fee_charges_amount_check', sql`${table.amountMinor} > 0`),
+  tenantPolicy(table),
+]).enableRLS();
+
+export const feeReceiptCounters = pgTable('fee_receipt_counters', {
+  tenantId: uuid('tenant_id').notNull(),
+  schoolId: uuid('school_id').notNull(),
+  nextNumber: bigint('next_number', { mode: 'bigint' }).notNull().default(sql`1`),
+}, (table) => [
+  foreignKey({ columns: [table.tenantId, table.schoolId], foreignColumns: [schools.tenantId, schools.id], name: 'fee_receipt_counters_school_fk' }).onDelete('restrict'),
+  unique('fee_receipt_counters_scope_unique').on(table.tenantId, table.schoolId),
+  check('fee_receipt_counters_positive_check', sql`${table.nextNumber} > 0`),
+  tenantPolicy(table),
+]).enableRLS();
+
+export const feePayments = pgTable('fee_payments', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  schoolId: uuid('school_id').notNull(),
+  schoolEnrollmentId: uuid('school_enrollment_id').notNull(),
+  receiptNumber: bigint('receipt_number', { mode: 'bigint' }).notNull(),
+  idempotencyKey: text('idempotency_key').notNull(),
+  method: text('method').notNull(),
+  reference: text('reference'),
+  amountMinor: bigint('amount_minor', { mode: 'bigint' }).notNull(),
+  actorAccountId: uuid('actor_account_id').notNull(),
+  actorMembershipId: uuid('actor_membership_id').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.tenantId, table.schoolId, table.schoolEnrollmentId], foreignColumns: [studentSchoolEnrollments.tenantId, studentSchoolEnrollments.schoolId, studentSchoolEnrollments.id], name: 'fee_payments_enrollment_fk' }).onDelete('restrict'),
+  foreignKey({ columns: [table.tenantId, table.actorMembershipId], foreignColumns: [memberships.tenantId, memberships.id], name: 'fee_payments_actor_membership_fk' }).onDelete('restrict'),
+  foreignKey({ columns: [table.actorAccountId, table.actorMembershipId], foreignColumns: [memberships.accountId, memberships.id], name: 'fee_payments_actor_fk' }).onDelete('restrict'),
+  unique('fee_payments_scope_id_unique').on(table.tenantId, table.schoolId, table.id),
+  unique('fee_payments_enrollment_scope_id_unique').on(table.tenantId, table.schoolId, table.schoolEnrollmentId, table.id),
+  uniqueIndex('fee_payments_receipt_unique').on(table.tenantId, table.schoolId, table.receiptNumber),
+  uniqueIndex('fee_payments_idempotency_unique').on(table.tenantId, table.schoolId, table.idempotencyKey),
+  check('fee_payments_method_check', sql`${table.method} in ('cash', 'bank_transfer', 'cheque', 'card_terminal', 'other')`),
+  check('fee_payments_amount_check', sql`${table.amountMinor} > 0`),
+  tenantPolicy(table),
+]).enableRLS();
+
+export const feeLedgerEntries = pgTable('fee_ledger_entries', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  schoolId: uuid('school_id').notNull(),
+  schoolEnrollmentId: uuid('school_enrollment_id').notNull(),
+  chargeId: uuid('charge_id').notNull(),
+  paymentId: uuid('payment_id'),
+  kind: text('kind').notNull(),
+  amountMinor: bigint('amount_minor', { mode: 'bigint' }).notNull(),
+  reason: text('reason'),
+  actorAccountId: uuid('actor_account_id').notNull(),
+  actorMembershipId: uuid('actor_membership_id').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.tenantId, table.schoolId, table.schoolEnrollmentId], foreignColumns: [studentSchoolEnrollments.tenantId, studentSchoolEnrollments.schoolId, studentSchoolEnrollments.id], name: 'fee_ledger_entries_enrollment_fk' }).onDelete('restrict'),
+  foreignKey({ columns: [table.tenantId, table.schoolId, table.schoolEnrollmentId, table.chargeId], foreignColumns: [feeCharges.tenantId, feeCharges.schoolId, feeCharges.schoolEnrollmentId, feeCharges.id], name: 'fee_ledger_entries_charge_fk' }).onDelete('restrict'),
+  foreignKey({ columns: [table.tenantId, table.schoolId, table.schoolEnrollmentId, table.paymentId], foreignColumns: [feePayments.tenantId, feePayments.schoolId, feePayments.schoolEnrollmentId, feePayments.id], name: 'fee_ledger_entries_payment_fk' }).onDelete('restrict'),
+  foreignKey({ columns: [table.tenantId, table.actorMembershipId], foreignColumns: [memberships.tenantId, memberships.id], name: 'fee_ledger_entries_actor_membership_fk' }).onDelete('restrict'),
+  foreignKey({ columns: [table.actorAccountId, table.actorMembershipId], foreignColumns: [memberships.accountId, memberships.id], name: 'fee_ledger_entries_actor_fk' }).onDelete('restrict'),
+  unique('fee_ledger_entries_scope_id_unique').on(table.tenantId, table.schoolId, table.id),
+  uniqueIndex('fee_ledger_entries_charge_unique').on(table.tenantId, table.schoolId, table.chargeId).where(sql`${table.kind} = 'charge'`),
+  uniqueIndex('fee_ledger_entries_reversal_unique').on(table.tenantId, table.schoolId, table.paymentId, table.chargeId).where(sql`${table.kind} = 'payment_reversal'`),
+  index('fee_ledger_entries_enrollment_created_idx').on(table.tenantId, table.schoolId, table.schoolEnrollmentId, table.createdAt),
+  check('fee_ledger_entries_kind_check', sql`${table.kind} in ('charge', 'concession', 'payment', 'payment_reversal')`),
+  check('fee_ledger_entries_amount_check', sql`${table.amountMinor} > 0`),
   tenantPolicy(table),
 ]).enableRLS();

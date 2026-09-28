@@ -12,9 +12,10 @@ import { EnrollmentModule } from './enrollment/enrollment.module.js';
 import { AdmissionsModule } from './admissions/admissions.module.js';
 import { TimetableModule } from './timetable/timetable.module.js';
 import { AttendanceModule } from './attendance/attendance.module.js';
+import { FinanceModule } from './finance/finance.module.js';
 
 @Module({
-  imports: [DatabaseModule, AuthModule, AuthorizationModule, AcademicsModule, PeopleModule, EnrollmentModule, AdmissionsModule, TimetableModule, AttendanceModule],
+  imports: [DatabaseModule, AuthModule, AuthorizationModule, AcademicsModule, PeopleModule, EnrollmentModule, AdmissionsModule, TimetableModule, AttendanceModule, FinanceModule],
   controllers: [HealthController],
   providers: [{ provide: APP_FILTER, useClass: HttpExceptionEnvelopeFilter }],
 })

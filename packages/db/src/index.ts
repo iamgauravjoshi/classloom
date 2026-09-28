@@ -39,6 +39,14 @@ export {
   dailyAttendanceRegisters,
   dailyAttendanceEntries,
   dailyAttendanceEvents,
+  feeHeads,
+  feePlans,
+  feePlanLines,
+  feeAssignments,
+  feeCharges,
+  feeReceiptCounters,
+  feePayments,
+  feeLedgerEntries,
   guardianProfiles,
   teacherProfiles,
   tenants,
@@ -138,6 +146,9 @@ export {
   findActiveAcademicEnrollment,
   listAcademicEnrollmentHistory,
   listAttendanceRoster,
+  lockFinanceEnrollment,
+  listFinanceEnrollments,
+  hasFinancePlacement,
   listActiveStudentSchoolIds,
   listActiveGuardianSchoolIds,
   listSchoolStudentIds,
@@ -215,6 +226,13 @@ export type {
   AttendanceScope,
   AttendanceStatus,
 } from './attendance.js';
+export {
+  FinanceError, minorUnits, balanceFromEntries, getFinanceSchool, listFinanceSchools, listFeeSetup,
+  createFeeHead, createFeePlan, createFeePlanLine, getFeePlan, assignFeePlan,
+  readFeeStatement, grantFeeConcession, findPaymentByKey, readFeeReceipt,
+  recordFeePayment, reverseFeePayment, listFeeOutstanding,
+} from './finance.js';
+export type { FinanceScope, FinanceActor, PaymentAllocation } from './finance.js';
 export {
   AdmissionError,
   nextAdmissionStatus,
