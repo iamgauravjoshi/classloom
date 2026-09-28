@@ -4,7 +4,7 @@ import {
   getAttendanceSchool,
   getDailyAttendanceRegister,
   listDailyAttendanceEvents,
-  listStaffSchools,
+  listAttendanceSchools,
   readDailyAttendance,
   saveDailyAttendance,
   withTenantContext,
@@ -82,12 +82,12 @@ export class AttendanceService {
 
   async listSchools(actor: AttendanceUserActor) {
     return this.tenantRunner(this.database.db, actor.tenantId, async (tx) => {
-      const schools = await listStaffSchools(tx, actor.tenantId);
+      const schools = await listAttendanceSchools(tx, actor.tenantId);
       const results = await Promise.all(schools.map(async (school) => {
         const [canReadAttendance, canRecordAttendance] = await Promise.all([
           this.allowed(actor, school.id, 'attendance.read'), this.allowed(actor, school.id, 'attendance.record'),
         ]);
-        return { ...school, canReadAttendance, canRecordAttendance };
+        return { ...school, today: schoolLocalDate(new Date(), school.timezone), canReadAttendance, canRecordAttendance };
       }));
       return results.filter((school) => school.canReadAttendance || school.canRecordAttendance);
     });

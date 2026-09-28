@@ -98,6 +98,9 @@ describe.skipIf(!enabled)('attendance API', () => {
     const query = { date: new Date().toISOString().slice(0, 10), sectionId };
     expect((await request(app.getHttpServer()).get('/api/v1/attendance/schools')).status).toBe(401);
     expect((await request(app.getHttpServer()).get('/api/v1/attendance/schools').set('Cookie', ordinaryCookie)).body).toEqual([]);
+    const accessibleSchools = await request(app.getHttpServer()).get('/api/v1/attendance/schools').set('Cookie', adminCookie);
+    expect(accessibleSchools.status).toBe(200);
+    expect(accessibleSchools.body).toEqual([expect.objectContaining({ id: schoolId, timezone: 'UTC', today: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) })]);
     expect((await request(app.getHttpServer()).get(base).query(query).set('Cookie', ordinaryCookie)).status).toBe(403);
     expect((await request(app.getHttpServer()).put(base).query(query).set('Cookie', adminCookie).send({ entries: [] })).status).toBe(403);
     const invalid = await request(app.getHttpServer()).put(base).query({ ...query, unexpected: 'no' })

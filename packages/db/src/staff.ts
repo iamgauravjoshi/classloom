@@ -172,6 +172,11 @@ export async function listStaffSchools(tx: TenantTransaction, tenantId: string) 
     .from(schools).where(eq(schools.tenantId, tenantId)).orderBy(schools.name);
 }
 
+export async function listAttendanceSchools(tx: TenantTransaction, tenantId: string) {
+  return tx.select({ id: schools.id, name: schools.name, code: schools.code, timezone: schools.timezone })
+    .from(schools).where(eq(schools.tenantId, tenantId)).orderBy(schools.name);
+}
+
 export async function getAttendanceSchool(tx: TenantTransaction, scope: StaffScope) {
   const [school] = await tx.select({ id: schools.id, name: schools.name, code: schools.code, timezone: schools.timezone })
     .from(schools).where(and(eq(schools.tenantId, scope.tenantId), eq(schools.id, scope.schoolId))).limit(1);

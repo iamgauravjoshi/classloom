@@ -63,6 +63,7 @@ export {
   isAssignableTeacher,
   getAttendanceTeacherLink,
   getAttendanceSchool,
+  listAttendanceSchools,
   listAssignableTeacherAccounts,
 } from './staff.js';
 export type { StaffScope, StaffProfileInput, StaffAffiliationInput, StaffCreateInput, StaffListFilters, StaffListPage, StaffRecord, StaffAudit } from './staff.js';
