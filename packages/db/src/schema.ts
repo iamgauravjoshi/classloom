@@ -743,6 +743,8 @@ export const weeklyTimetables = pgTable('weekly_timetables', {
 }, (table) => [
   foreignKey({ columns: [table.tenantId, table.schoolId], foreignColumns: [schools.tenantId, schools.id], name: 'weekly_timetables_school_fk' }).onDelete('cascade'),
   foreignKey({ columns: [table.tenantId, table.schoolId, table.sessionId], foreignColumns: [academicSessions.tenantId, academicSessions.schoolId, academicSessions.id], name: 'weekly_timetables_session_fk' }).onDelete('restrict'),
+  foreignKey({ columns: [table.tenantId, table.createdByMembershipId], foreignColumns: [memberships.tenantId, memberships.id], name: 'weekly_timetables_created_by_tenant_membership_fk' }).onDelete('restrict'),
+  foreignKey({ columns: [table.tenantId, table.updatedByMembershipId], foreignColumns: [memberships.tenantId, memberships.id], name: 'weekly_timetables_updated_by_tenant_membership_fk' }).onDelete('restrict'),
   foreignKey({ columns: [table.createdByAccountId, table.createdByMembershipId], foreignColumns: [memberships.accountId, memberships.id], name: 'weekly_timetables_created_by_actor_fk' }).onDelete('restrict'),
   foreignKey({ columns: [table.updatedByAccountId, table.updatedByMembershipId], foreignColumns: [memberships.accountId, memberships.id], name: 'weekly_timetables_updated_by_actor_fk' }).onDelete('restrict'),
   unique('weekly_timetables_tenant_school_id_unique').on(table.tenantId, table.schoolId, table.id),
@@ -777,6 +779,8 @@ export const weeklyTimetableSlots = pgTable('weekly_timetable_slots', {
   foreignKey({ columns: [table.tenantId, table.schoolId, table.sessionId, table.sectionId], foreignColumns: [academicSections.tenantId, academicSections.schoolId, academicSections.sessionId, academicSections.id], name: 'weekly_timetable_slots_section_fk' }).onDelete('restrict'),
   foreignKey({ columns: [table.tenantId, table.schoolId, table.sessionId, table.subjectId], foreignColumns: [academicSubjects.tenantId, academicSubjects.schoolId, academicSubjects.sessionId, academicSubjects.id], name: 'weekly_timetable_slots_subject_fk' }).onDelete('restrict'),
   foreignKey({ columns: [table.tenantId, table.schoolId, table.sessionId, table.teacherAssignmentId], foreignColumns: [academicTeacherAssignments.tenantId, academicTeacherAssignments.schoolId, academicTeacherAssignments.sessionId, academicTeacherAssignments.id], name: 'weekly_timetable_slots_teacher_assignment_fk' }).onDelete('restrict'),
+  foreignKey({ columns: [table.tenantId, table.createdByMembershipId], foreignColumns: [memberships.tenantId, memberships.id], name: 'weekly_timetable_slots_created_by_tenant_membership_fk' }).onDelete('restrict'),
+  foreignKey({ columns: [table.tenantId, table.updatedByMembershipId], foreignColumns: [memberships.tenantId, memberships.id], name: 'weekly_timetable_slots_updated_by_tenant_membership_fk' }).onDelete('restrict'),
   foreignKey({ columns: [table.createdByAccountId, table.createdByMembershipId], foreignColumns: [memberships.accountId, memberships.id], name: 'weekly_timetable_slots_created_by_actor_fk' }).onDelete('restrict'),
   foreignKey({ columns: [table.updatedByAccountId, table.updatedByMembershipId], foreignColumns: [memberships.accountId, memberships.id], name: 'weekly_timetable_slots_updated_by_actor_fk' }).onDelete('restrict'),
   uniqueIndex('weekly_timetable_slots_scope_id_unique').on(table.tenantId, table.schoolId, table.id),

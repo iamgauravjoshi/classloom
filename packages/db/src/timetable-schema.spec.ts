@@ -36,9 +36,13 @@ describe('weekly timetable schema', () => {
     const timetableConfig = getTableConfig(schema.weeklyTimetables);
     expect(timetableConfig.uniqueConstraints.some(({ name }) => name === 'weekly_timetables_tenant_school_id_unique')).toBe(true);
     expect(timetableConfig.indexes.some(({ config }) => config.name === 'weekly_timetables_session_unique')).toBe(true);
+    expect(timetableConfig.foreignKeys.map((foreignKey) => foreignKey.getName())).toEqual(expect.arrayContaining([
+      'weekly_timetables_created_by_tenant_membership_fk', 'weekly_timetables_updated_by_tenant_membership_fk',
+    ]));
     const slotConfig = getTableConfig(schema.weeklyTimetableSlots);
     expect(slotConfig.foreignKeys.map((foreignKey) => foreignKey.getName())).toEqual(expect.arrayContaining([
       'weekly_timetable_slots_parent_fk', 'weekly_timetable_slots_section_fk', 'weekly_timetable_slots_subject_fk', 'weekly_timetable_slots_teacher_assignment_fk',
+      'weekly_timetable_slots_created_by_tenant_membership_fk', 'weekly_timetable_slots_updated_by_tenant_membership_fk',
     ]));
     expect(slotConfig.checks.map(({ name }) => name)).toEqual(expect.arrayContaining([
       'weekly_timetable_slots_weekday_check', 'weekly_timetable_slots_time_check',
