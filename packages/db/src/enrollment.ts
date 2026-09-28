@@ -363,7 +363,8 @@ export async function listAttendanceRoster(
       or(isNull(studentAcademicEnrollments.endDate), gte(studentAcademicEnrollments.endDate, date)),
       eq(studentProfiles.status, 'active'),
     ))
-    .orderBy(asc(studentAcademicEnrollments.rollNumber), asc(studentProfiles.familyName), asc(studentProfiles.givenName), asc(studentAcademicEnrollments.id));
+    .orderBy(asc(studentAcademicEnrollments.rollNumber), asc(studentProfiles.familyName), asc(studentProfiles.givenName), asc(studentAcademicEnrollments.id))
+    .for('share', { of: studentAcademicEnrollments });
 }
 
 export async function listActiveStudentSchoolIds(tx: TenantTransaction, tenantId: string, studentId: string) {

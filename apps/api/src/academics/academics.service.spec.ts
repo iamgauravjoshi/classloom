@@ -73,4 +73,26 @@ describe('AcademicsService timetable contracts', () => {
       .rejects.toMatchObject({ code: 'CONFLICT' });
     expect(canAssignTeacher).toHaveBeenCalledWith(tx, scope, 'teacher-1');
   });
+
+  it('lists sections for a session and limits teacher memberships to assigned sections', async () => {
+    const secondSetup = {
+      ...setup,
+      classes: [...setup.classes, { id: 'class-2', sessionId: 'session-1', name: 'Grade 9', code: 'G9' }],
+      sections: [...setup.sections, { id: 'section-2', classId: 'class-2', sessionId: 'session-1', name: 'B', code: 'B' }],
+    };
+    const { service } = serviceWith(vi.fn().mockResolvedValue(secondSetup));
+    const serviceWithAttendance = service as unknown as {
+      listAttendanceSections(tx: TenantTransaction, scope: TestScope, sessionId: string, membershipId?: string): Promise<unknown[]>;
+    };
+    await expect(serviceWithAttendance.listAttendanceSections(tx, scope, 'session-1')).resolves.toHaveLength(2);
+    await expect(serviceWithAttendance.listAttendanceSections(tx, scope, 'session-1', 'teacher-1')).resolves.toEqual([
+      expect.objectContaining({ id: 'section-1', label: 'Grade 8 · A' }),
+    ]);
+  });
+
+  it('does not expose sections for a foreign session', async () => {
+    const { service } = serviceWith(vi.fn().mockResolvedValue({ ...setup, sessions: [] }));
+    await expect((service as unknown as { listAttendanceSections: Function }).listAttendanceSections(tx, scope, 'foreign'))
+      .rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
 });

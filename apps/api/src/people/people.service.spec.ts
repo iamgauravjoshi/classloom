@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { AuthorizationService, type AuthorizationGrantReader } from '../authorization/authorization.service.js';
 import { PeopleService } from './people.service.js';
 
@@ -27,5 +27,15 @@ describe('PeopleService shared staff permission', () => {
 
   it('fails closed for a profile with no school affiliation', async () => {
     expect(await serviceWithSchoolManage([schoolOne]).canEditShared(actor, [])).toBe(false);
+  });
+
+  it('returns only linked and eligibility flags for attendance teacher checks', async () => {
+    const reader = vi.fn().mockResolvedValue({ linked: true, eligible: false });
+    const service = new PeopleService(new AuthorizationService({
+      listMembershipAuthorizationGrants: async () => [], isScopeInTenant: async () => true,
+    }), reader);
+    await expect(service.getAttendanceTeacherLink({} as never, { tenantId: 'tenant-a', schoolId: schoolOne }, 'membership-a'))
+      .resolves.toEqual({ linked: true, eligible: false });
+    expect(reader).toHaveBeenCalled();
   });
 });

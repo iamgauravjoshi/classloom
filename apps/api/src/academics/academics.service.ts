@@ -61,6 +61,36 @@ export class AcademicsService {
     return { sections, subjects, teacherAssignments };
   }
 
+  async listAttendanceSections(tx: TenantTransaction, scope: AcademicScope, sessionId: string, membershipId?: string) {
+    const setup = await this.setupReader(tx, scope);
+    if (!setup.sessions.some((session) => session.id === sessionId)) {
+      throw new AcademicSetupError('NOT_FOUND', 'Academic session was not found in this school');
+    }
+    const classById = new Map(setup.classes.filter((item) => item.sessionId === sessionId).map((item) => [item.id, item]));
+    const assignedSectionIds = membershipId === undefined
+      ? null
+      : new Set(setup.assignments.filter((item) => item.sessionId === sessionId && item.membershipId === membershipId).map((item) => item.sectionId));
+    return setup.sections.filter((section) => section.sessionId === sessionId && (!assignedSectionIds || assignedSectionIds.has(section.id)))
+      .flatMap((section) => {
+        const academicClass = classById.get(section.classId);
+        if (!academicClass) return [];
+        return [{
+          id: section.id,
+          classId: academicClass.id,
+          className: academicClass.name,
+          classCode: academicClass.code,
+          name: section.name,
+          code: section.code,
+          label: `${academicClass.name} · ${section.name}`,
+        }];
+      });
+  }
+
+  async listAttendanceSessions(tx: TenantTransaction, scope: AcademicScope) {
+    const setup = await this.setupReader(tx, scope);
+    return setup.sessions.map(({ id, name, code, startDate, endDate, status }) => ({ id, name, code, startDate, endDate, status }));
+  }
+
   async requireTimetableAssignment(
     tx: TenantTransaction,
     scope: AcademicScope,

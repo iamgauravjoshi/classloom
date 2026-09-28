@@ -62,6 +62,7 @@ export {
   listEligibleStaffAccounts,
   isAssignableTeacher,
   getAttendanceTeacherLink,
+  getAttendanceSchool,
   listAssignableTeacherAccounts,
 } from './staff.js';
 export type { StaffScope, StaffProfileInput, StaffAffiliationInput, StaffCreateInput, StaffListFilters, StaffListPage, StaffRecord, StaffAudit } from './staff.js';
@@ -200,6 +201,7 @@ export {
   changedAttendanceEntries,
   normalizeAttendanceRegisterInput,
   readDailyAttendance,
+  getDailyAttendanceRegister,
   saveDailyAttendance,
   listDailyAttendanceEvents,
 } from './attendance.js';

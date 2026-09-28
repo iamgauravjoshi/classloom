@@ -130,6 +130,14 @@ export async function readDailyAttendance(
   return { register, entries, completion: calculateAttendanceCompletion(entries) };
 }
 
+export async function getDailyAttendanceRegister(tx: TenantTransaction, scope: AttendanceScope, registerId: string) {
+  const [register] = await tx.select().from(dailyAttendanceRegisters).where(and(
+    eq(dailyAttendanceRegisters.tenantId, scope.tenantId), eq(dailyAttendanceRegisters.schoolId, scope.schoolId),
+    eq(dailyAttendanceRegisters.id, registerId),
+  )).limit(1);
+  return register ?? null;
+}
+
 async function lockOrCreateRegister(
   tx: TenantTransaction,
   scope: AttendanceScope,
