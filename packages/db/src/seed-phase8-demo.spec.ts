@@ -131,8 +131,12 @@ describe.skipIf(!persistenceEnabled)('Phase 8 timetable demo seed persistence', 
   it('is idempotent, preserves manual conflicts, and does not write identity records', async () => {
     const target = { tenant: slug, school: 'SEED', session: 'DEMO-SESSION', seed: 26092026 };
     const [before] = await admin<{ accounts: number; credentials: number; memberships: number; invitations: number; staff: number }[]>`
-      select (select count(*)::int from accounts) as accounts,
-             (select count(*)::int from account_credentials) as credentials,
+      select (select count(*)::int from accounts a where exists (
+               select 1 from memberships m where m.account_id = a.id and m.tenant_id = ${tenantId}
+             )) as accounts,
+             (select count(*)::int from account_credentials c where exists (
+               select 1 from memberships m where m.account_id = c.account_id and m.tenant_id = ${tenantId}
+             )) as credentials,
              (select count(*)::int from memberships where tenant_id = ${tenantId}) as memberships,
              (select count(*)::int from invitations where tenant_id = ${tenantId}) as invitations,
              (select count(*)::int from staff_profiles where tenant_id = ${tenantId}) as staff`;
@@ -141,8 +145,12 @@ describe.skipIf(!persistenceEnabled)('Phase 8 timetable demo seed persistence', 
     expect(first).toMatchObject({ tenantId, schoolId, sessionId, createdSubjects: 5, createdSlots: 3, skippedConflicts: 1 });
     expect(second).toMatchObject({ createdSubjects: 0, createdSlots: 0, existingDemoSlots: 3, skippedConflicts: 1 });
     const [after] = await admin<{ accounts: number; credentials: number; memberships: number; invitations: number; staff: number }[]>`
-      select (select count(*)::int from accounts) as accounts,
-             (select count(*)::int from account_credentials) as credentials,
+      select (select count(*)::int from accounts a where exists (
+               select 1 from memberships m where m.account_id = a.id and m.tenant_id = ${tenantId}
+             )) as accounts,
+             (select count(*)::int from account_credentials c where exists (
+               select 1 from memberships m where m.account_id = c.account_id and m.tenant_id = ${tenantId}
+             )) as credentials,
              (select count(*)::int from memberships where tenant_id = ${tenantId}) as memberships,
              (select count(*)::int from invitations where tenant_id = ${tenantId}) as invitations,
              (select count(*)::int from staff_profiles where tenant_id = ${tenantId}) as staff`;
