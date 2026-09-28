@@ -5,6 +5,7 @@ import {
   createSchoolEnrollment,
   transferAcademicEnrollment,
   withdrawAcademicEnrollment,
+  listAttendanceRoster,
   type AcademicEnrollmentInput,
   type EnrollmentCloseInput,
   type EnrollmentPlacementInput,
@@ -25,6 +26,8 @@ export interface EnrollmentPersistence {
   withdraw: typeof withdrawAcademicEnrollment;
   complete: typeof completeAcademicEnrollment;
 }
+
+export type AttendanceRosterReader = typeof listAttendanceRoster;
 
 export type StudentAdmissionInput = {
   student: StudentProfileInput;
@@ -56,6 +59,7 @@ export class EnrollmentService {
     @Inject(StudentPeopleService) readonly people: StudentPeopleService,
     @Inject(AcademicsService) private readonly academics: AcademicsService,
     @Optional() private readonly persistence: EnrollmentPersistence = defaultPersistence,
+    @Optional() private readonly attendanceRosterReader: AttendanceRosterReader = listAttendanceRoster,
   ) {}
 
   private async require(actor: StudentPeopleActor, schoolId: string, permission: 'enrollment.read' | 'enrollment.manage', message: string) {
@@ -70,6 +74,10 @@ export class EnrollmentService {
 
   requireManage(actor: StudentPeopleActor, schoolId: string) {
     return this.require(actor, schoolId, 'enrollment.manage', 'Enrollment changes are not allowed for this school');
+  }
+
+  listAttendanceRoster(tx: TenantTransaction, scope: { tenantId: string; schoolId: string }, sessionId: string, sectionId: string, date: string) {
+    return this.attendanceRosterReader(tx, scope, sessionId, sectionId, date);
   }
 
   async admitStudent(tx: TenantTransaction, actor: StudentPeopleActor, schoolId: string, input: StudentAdmissionInput) {

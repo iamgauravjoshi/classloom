@@ -99,4 +99,21 @@ describe('authorization catalog', () => {
     expect(role('teacher')).not.toContain('timetable.manage');
     expect(role('auditor')).not.toContain('timetable.manage');
   });
+
+  it('scopes attendance permissions to the school register boundary', () => {
+    const permissionByKey = new Map(PERMISSION_CATALOG.map((permission) => [permission.key, permission]));
+    expect(permissionByKey.get('attendance.read')).toEqual({
+      key: 'attendance.read', family: 'attendance', scopeKind: 'school', action: 'read', readOnly: true,
+    });
+    expect(permissionByKey.get('attendance.record')).toEqual({
+      key: 'attendance.record', family: 'attendance', scopeKind: 'school', action: 'record', readOnly: false,
+    });
+    for (const key of ['tenant_admin', 'school_admin', 'teacher', 'attendance_operator']) {
+      expect(BUILT_IN_ROLE_TEMPLATES.find((role) => role.key === key)?.permissionKeys)
+        .toEqual(expect.arrayContaining(['attendance.read', ...(key === 'principal' || key === 'auditor' ? [] : ['attendance.record'])]));
+    }
+    expect(BUILT_IN_ROLE_TEMPLATES.find((role) => role.key === 'principal')?.permissionKeys).toContain('attendance.read');
+    expect(BUILT_IN_ROLE_TEMPLATES.find((role) => role.key === 'auditor')?.permissionKeys).toContain('attendance.read');
+    expect(BUILT_IN_ROLE_TEMPLATES.find((role) => role.key === 'auditor')?.permissionKeys).not.toContain('attendance.record');
+  });
 });

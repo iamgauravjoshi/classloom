@@ -15,6 +15,7 @@ import {
   createSchoolEnrollment,
   EnrollmentError,
   listAcademicEnrollmentHistory,
+  listAttendanceRoster,
   transferAcademicEnrollment,
   withdrawAcademicEnrollment,
 } from './enrollment.js';
@@ -119,6 +120,20 @@ describe.skipIf(!enabled)('student enrollment persistence', () => {
     await expect(withTenantContext(runtime.db, tenantId, (tx) => resolveEnrollmentPlacement(tx, scope, {
       sessionId: archivedSession.id, classId: archivedClass.id, sectionId: archivedSection.id,
     }))).rejects.toMatchObject({ code: 'NOT_FOUND', message: expect.stringMatching(/draft or active/i) });
+  });
+
+  it('returns only enrollment roster rows effective on the requested date', async () => {
+    const person = await student('ATTENDANCE-ROSTER');
+    const scope = { tenantId, schoolId };
+    await withTenantContext(runtime.db, tenantId, async (tx) => {
+      const school = await createSchoolEnrollment(tx, scope, person.id, { admissionNumber: 'ADM-ATTENDANCE', admissionDate: '2026-04-01' }, { actorAccountId });
+      const placement = await resolveEnrollmentPlacement(tx, scope, { sessionId, classId, sectionId: sectionOneId });
+      await createAcademicEnrollment(tx, scope, school.id, placement, { rollNumber: '8-A-09', startDate: '2026-04-01' }, { actorAccountId });
+    });
+    await expect(withTenantContext(runtime.db, tenantId, (tx) => listAttendanceRoster(tx, scope, sessionId, sectionOneId, '2026-03-31')))
+      .resolves.toEqual([]);
+    await expect(withTenantContext(runtime.db, tenantId, (tx) => listAttendanceRoster(tx, scope, sessionId, sectionOneId, '2026-04-01')))
+      .resolves.toContainEqual(expect.objectContaining({ studentId: person.id, rollNumber: '8-A-09', displayName: 'Test ATTENDANCE-ROSTER' }));
   });
 
   it('reports admission and active roll-number conflicts clearly', async () => {

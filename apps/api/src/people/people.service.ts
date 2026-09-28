@@ -1,15 +1,22 @@
-import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
-import { isAssignableTeacher, listAssignableTeacherAccounts, type StaffScope, type TenantTransaction } from '@classloom/db';
+import { ForbiddenException, Inject, Injectable, Optional } from '@nestjs/common';
+import { getAttendanceTeacherLink, isAssignableTeacher, listAssignableTeacherAccounts, type StaffScope, type TenantTransaction } from '@classloom/db';
 import { AuthorizationService } from '../authorization/authorization.service.js';
 
 export type PeopleActor = { tenantId: string; accountId: string; membershipId: string; requestId?: string };
 
 @Injectable()
 export class PeopleService {
-  constructor(@Inject(AuthorizationService) private readonly authorization: AuthorizationService) {}
+  constructor(
+    @Inject(AuthorizationService) private readonly authorization: AuthorizationService,
+    @Optional() private readonly attendanceTeacherLinkReader: typeof getAttendanceTeacherLink = getAttendanceTeacherLink,
+  ) {}
 
   async canReadSchool(actor: PeopleActor, schoolId: string): Promise<boolean> {
     return this.authorization.hasPermissions(actor, ['staff.read'], { kind: 'school', schoolId });
+  }
+
+  getAttendanceTeacherLink(tx: TenantTransaction, scope: StaffScope, membershipId: string) {
+    return this.attendanceTeacherLinkReader(tx, scope, membershipId);
   }
 
   async canManageSchool(actor: PeopleActor, schoolId: string): Promise<boolean> {

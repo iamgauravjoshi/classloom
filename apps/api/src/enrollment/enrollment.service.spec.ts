@@ -19,6 +19,15 @@ function authorization(permissionKeys: string[]) {
 }
 
 describe('EnrollmentService', () => {
+  it('exposes a date-scoped attendance roster without rechecking enrollment.read', async () => {
+    const roster = [{ academicEnrollmentId: 'enrollment-1', studentId: 'student-1', rollNumber: '2', displayName: 'Asha Shah' }];
+    const reader = vi.fn().mockResolvedValue(roster);
+    const service = new EnrollmentService(authorization([]), new StudentPeopleService(authorization([])), new AcademicsService(vi.fn()), undefined, reader);
+    const tx = {} as TenantTransaction;
+    await expect(service.listAttendanceRoster(tx, { tenantId: actor.tenantId, schoolId }, 'session-1', 'section-1', '2026-09-28')).resolves.toEqual(roster);
+    expect(reader).toHaveBeenCalledWith(tx, { tenantId: actor.tenantId, schoolId }, 'session-1', 'section-1', '2026-09-28');
+  });
+
   it('creates an admission through People and Academics contracts in one transaction', async () => {
     const rights = authorization(['student.manage', 'guardian.manage', 'enrollment.manage']);
     const people = new StudentPeopleService(rights);
