@@ -146,11 +146,19 @@ async function resetToDraft(tx: TenantTransaction, scope: TimetableScope, timeta
   ));
 }
 
-export async function insertTimetableSlot(tx: TenantTransaction, scope: TimetableScope, timetableId: string, input: TimetableSlotInput, actor: TimetableActor) {
+export async function insertTimetableSlot(
+  tx: TenantTransaction,
+  scope: TimetableScope,
+  timetableId: string,
+  input: TimetableSlotInput,
+  actor: TimetableActor,
+  options: { demoKey?: string } = {},
+) {
   const normalized = normalizeTimetableSlotInput(input);
   try {
     const [slot] = await tx.insert(weeklyTimetableSlots).values({
       ...scope, timetableId, ...normalized,
+      demoKey: options.demoKey ?? null,
       createdByAccountId: actor.accountId, createdByMembershipId: actor.membershipId,
       updatedByAccountId: actor.accountId, updatedByMembershipId: actor.membershipId,
     }).returning();

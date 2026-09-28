@@ -60,7 +60,7 @@ describe('TimetableService slot validation and lifecycle', () => {
   it('allows adjacent slots and persists an unassigned teacher slot', async () => {
     const { service, persistence, academics } = harness({ slots: [{ ...slotInput, id: 'existing', endTime: '09:00', teacherMembershipId: 'teacher-1' }], assigned: false });
     await expect(service.createSlot(actor, scope, { ...slotInput, teacherAssignmentId: null })).resolves.toMatchObject({ id: 'slot-new' });
-    expect(academics.requireTimetableAssignment.mock.calls).toHaveLength(0);
+    expect(academics.requireTimetableAssignment).toHaveBeenCalledTimes(0);
     expect(persistence.insert).toHaveBeenCalledWith(expect.anything(), scope, timetable.id, expect.objectContaining({ teacherAssignmentId: null }), actor);
   });
 
