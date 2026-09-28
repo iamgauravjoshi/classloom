@@ -67,9 +67,10 @@ describe('AcademicsService timetable contracts', () => {
   });
 
   it('rejects an assignment when its teacher is no longer eligible', async () => {
-    const { service, people } = serviceWith(undefined, { canAssignTeacher: vi.fn().mockResolvedValue(false) });
+    const canAssignTeacher = vi.fn().mockResolvedValue(false);
+    const { service } = serviceWith(undefined, { canAssignTeacher });
     await expect(service.requireTimetableAssignment(tx, scope, 'session-1', 'section-1', 'subject-1', 'assignment-1'))
       .rejects.toMatchObject({ code: 'CONFLICT' });
-    expect(people.canAssignTeacher).toHaveBeenCalledWith(tx, scope, 'teacher-1');
+    expect(canAssignTeacher).toHaveBeenCalledWith(tx, scope, 'teacher-1');
   });
 });

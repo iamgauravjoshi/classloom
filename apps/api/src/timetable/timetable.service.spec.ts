@@ -26,14 +26,15 @@ function harness(options: { slots?: unknown[]; assigned?: boolean } = {}) {
     delete: vi.fn().mockResolvedValue(undefined),
     publish: vi.fn().mockResolvedValue({ ...timetable, status: 'published' }),
   };
+  const requireTimetableAssignment = vi.fn().mockResolvedValue(undefined);
   const academics = {
     listTimetableOptions: vi.fn().mockResolvedValue({
       sections: [{ id: 'section-1' }], subjects: [{ id: 'subject-1' }],
       teacherAssignments: options.assigned === false ? [] : [{ id: 'assignment-1', sectionId: 'section-1', subjectId: 'subject-1', membershipId: 'teacher-1' }],
     }),
-    requireTimetableAssignment: vi.fn().mockResolvedValue(undefined),
+    requireTimetableAssignment,
   } as unknown as AcademicsService;
-  return { tx, persistence, academics, service: new TimetableService(database, academics, persistence) };
+  return { tx, persistence, academics, requireTimetableAssignment, service: new TimetableService(database, academics, persistence) };
 }
 
 describe('TimetableService slot validation and lifecycle', () => {
@@ -58,9 +59,9 @@ describe('TimetableService slot validation and lifecycle', () => {
   });
 
   it('allows adjacent slots and persists an unassigned teacher slot', async () => {
-    const { service, persistence, academics } = harness({ slots: [{ ...slotInput, id: 'existing', endTime: '09:00', teacherMembershipId: 'teacher-1' }], assigned: false });
+    const { service, persistence, requireTimetableAssignment } = harness({ slots: [{ ...slotInput, id: 'existing', endTime: '09:00', teacherMembershipId: 'teacher-1' }], assigned: false });
     await expect(service.createSlot(actor, scope, { ...slotInput, teacherAssignmentId: null })).resolves.toMatchObject({ id: 'slot-new' });
-    expect(academics.requireTimetableAssignment).toHaveBeenCalledTimes(0);
+    expect(requireTimetableAssignment).toHaveBeenCalledTimes(0);
     expect(persistence.insert).toHaveBeenCalledWith(expect.anything(), scope, timetable.id, expect.objectContaining({ teacherAssignmentId: null }), actor);
   });
 
