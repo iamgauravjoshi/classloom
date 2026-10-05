@@ -107,6 +107,17 @@ export class AcademicsService {
     };
   }
 
+  async listExaminationOptions(tx: TenantTransaction, scope: AcademicScope) {
+    const setup = await this.setupReader(tx, scope);
+    return {
+      sessions: setup.sessions.map(({ id, name, startDate, endDate }) => ({ id, name, startDate, endDate })),
+      classes: setup.classes.map(({ id, sessionId, name }) => ({ id, sessionId, name })),
+      sections: setup.sections.map(({ id, sessionId, classId, name }) => ({ id, sessionId, classId, name })),
+      subjects: setup.subjects.map(({ id, sessionId, name }) => ({ id, sessionId, name })),
+      assignments: setup.assignments.map(({ sessionId, sectionId, subjectId, membershipId }) => ({ sessionId, sectionId, subjectId, membershipId })),
+    };
+  }
+
   async requireTimetableAssignment(
     tx: TenantTransaction,
     scope: AcademicScope,

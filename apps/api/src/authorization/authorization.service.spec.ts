@@ -19,12 +19,12 @@ describe('AuthorizationService', () => {
     const service = new AuthorizationService({
       listMembershipAuthorizationGrants: async () => [
         { permissionKey: 'school.read', scope: { kind: 'tenant' } },
-        { permissionKey: 'marks.enter', scope: { kind: 'tenant' } },
+        { permissionKey: 'results.publish', scope: { kind: 'tenant' } },
       ],
       isScopeInTenant,
     });
     expect(await service.hasPermissions(context, ['school.read'])).toBe(false);
-    expect(await service.hasPermissions(context, ['marks.enter'], { kind: 'school', schoolId: 'school-a' })).toBe(false);
+    expect(await service.hasPermissions(context, ['results.publish'], { kind: 'school', schoolId: 'school-a' })).toBe(false);
     expect(isScopeInTenant).not.toHaveBeenCalled();
     expect(await service.hasPermissions(context, ['school.read'], { kind: 'school', schoolId: 'school-a' })).toBe(true);
     isScopeInTenant.mockResolvedValueOnce(false);
@@ -37,6 +37,16 @@ describe('AuthorizationService', () => {
       isScopeInTenant: async () => true,
     });
     expect(await service.hasPermissions(context, ['authorization.roles.read'])).toBe(true);
+  });
+
+  it('resolves examination permissions to a school and denies other schools', async () => {
+    const service = new AuthorizationService({ listMembershipAuthorizationGrants: async () => [
+      { permissionKey: 'marks.enter', scope: { kind: 'school', schoolId: 'school-a' } },
+      { permissionKey: 'marks.approve', scope: { kind: 'school', schoolId: 'school-a' } },
+    ], isScopeInTenant: async () => true });
+    expect(await service.hasPermissions(context, ['marks.enter'])).toBe(false);
+    expect(await service.hasPermissions(context, ['marks.enter', 'marks.approve'], { kind: 'school', schoolId: 'school-a' })).toBe(true);
+    expect(await service.hasPermissions(context, ['marks.enter'], { kind: 'school', schoolId: 'school-b' })).toBe(false);
   });
 
   it('allows matching scoped grants and denies unsupported targets', async () => {

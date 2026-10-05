@@ -83,6 +83,10 @@ export class EnrollmentService {
     return this.attendanceRosterReader(tx, scope, sessionId, sectionId, date);
   }
 
+  listExaminationRoster(tx: TenantTransaction, scope: { tenantId: string; schoolId: string }, sessionId: string, sectionId: string, date: string) {
+    return this.attendanceRosterReader(tx, scope, sessionId, sectionId, date);
+  }
+
   lockFinanceEnrollment(tx: TenantTransaction, scope: { tenantId: string; schoolId: string }, schoolEnrollmentId: string) {
     return lockFinanceEnrollment(tx, scope, schoolEnrollmentId);
   }

@@ -29,3 +29,5 @@ Role administration is available through `GET /api/v1/authorization/permissions`
 Custom roles are created with a fixed permission set in this phase; permission-edit endpoints are deferred until role editing is scoped. Duplicate role keys return conflict, and duplicate permission keys are rejected.
 
 Academic and relationship scopes remain unsupported until their owning modules can resolve resources authoritatively. Permission keys such as `marks.enter` do not bypass domain workflow rules, such as an exam's editing window or result validation.
+
+Phase 11 activates the reserved `marks.read` and `marks.enter` keys at school scope and adds `exams.manage` and `marks.approve`. Both existing built-in roles (through migration) and newly provisioned roles receive the updated catalog. Administrators and principals can configure/review examinations; eligible linked teachers without those privileges access only their exact section/subject assessments. API checks enforce every action, including scheduled entry dates, sheet lifecycle, and different-account approval for corrections. Results publication remains an unsupported Phase 12 permission.

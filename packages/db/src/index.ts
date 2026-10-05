@@ -233,6 +233,7 @@ export {
   recordFeePayment, reverseFeePayment, listFeeOutstanding,
 } from './finance.js';
 export type { FinanceScope, FinanceActor, PaymentAllocation } from './finance.js';
+export * from './examinations.js';
 export {
   AdmissionError,
   nextAdmissionStatus,

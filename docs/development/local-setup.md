@@ -4,6 +4,8 @@ Install Node 24.15+ and pnpm 11.19, then follow the root README. Copy `.env.exam
 
 Start PostgreSQL with `docker compose up -d db`, then run `pnpm db:setup-runtime-role` followed by `pnpm db:migrate`. The role setup command is safe to rerun; migrations are safe to rerun.
 
+The existing ClassLoom development volume uses PostgreSQL 17, so Compose keeps `postgres:17-alpine` and its `/var/lib/postgresql/data` mount. Changing the image to PostgreSQL 18 does not upgrade that volume; use a documented dump/restore or major-version upgrade before switching. On 2026-10-05 the surviving volume was backed up read-only to `.local/backups/classloom-pg17-20261005.tar.gz`, then attached to PostgreSQL 17. Keep that private backup out of Git. Do not remove the volume when recovering existing data.
+
 Provision a starter tenant and school with:
 
 ```powershell

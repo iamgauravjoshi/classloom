@@ -1036,3 +1036,85 @@ export const feeLedgerEntries = pgTable('fee_ledger_entries', {
   check('fee_ledger_entries_amount_check', sql`${table.amountMinor} > 0`),
   tenantPolicy(table),
 ]).enableRLS();
+
+export const exams = pgTable('exams', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull(), schoolId: uuid('school_id').notNull(),
+  sessionId: uuid('session_id').notNull(), classId: uuid('class_id').notNull(),
+  name: text('name').notNull(), startDate: date('start_date').notNull(), endDate: date('end_date').notNull(),
+  status: text('status').notNull().default('draft'), version: integer('version').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  foreignKey({ columns: [t.tenantId, t.schoolId, t.sessionId, t.classId], foreignColumns: [academicClasses.tenantId, academicClasses.schoolId, academicClasses.sessionId, academicClasses.id], name: 'exams_class_fk' }).onDelete('restrict'),
+  unique('exams_scope_id').on(t.tenantId, t.schoolId, t.id),
+  unique('exams_academic_id').on(t.tenantId, t.schoolId, t.sessionId, t.classId, t.id),
+  uniqueIndex('exams_name_unique').on(t.tenantId, t.schoolId, t.sessionId, t.classId, sql`upper(trim(${t.name}))`),
+  check('exams_dates_check', sql`${t.endDate} >= ${t.startDate}`),
+  check('exams_status_check', sql`${t.status} in ('draft', 'open', 'completed')`),
+  check('exams_version_check', sql`${t.version} >= 0`), tenantPolicy(t),
+]).enableRLS();
+
+export const examAssessments = pgTable('exam_assessments', {
+  id: uuid('id').defaultRandom().primaryKey(), tenantId: uuid('tenant_id').notNull(), schoolId: uuid('school_id').notNull(),
+  examId: uuid('exam_id').notNull(), sessionId: uuid('session_id').notNull(), classId: uuid('class_id').notNull(),
+  sectionId: uuid('section_id').notNull(), subjectId: uuid('subject_id').notNull(),
+  label: text('label').notNull(), assessmentDate: date('assessment_date').notNull(),
+  maximumScore: integer('maximum_score').notNull(), passingScore: integer('passing_score').notNull(),
+  status: text('status').notNull().default('draft'), version: integer('version').notNull().default(0),
+}, (t) => [
+  foreignKey({ columns: [t.tenantId, t.schoolId, t.sessionId, t.classId, t.examId], foreignColumns: [exams.tenantId, exams.schoolId, exams.sessionId, exams.classId, exams.id], name: 'exam_assessments_exam_fk' }).onDelete('restrict'),
+  foreignKey({ columns: [t.tenantId, t.schoolId, t.sessionId, t.classId, t.sectionId], foreignColumns: [academicSections.tenantId, academicSections.schoolId, academicSections.sessionId, academicSections.classId, academicSections.id], name: 'exam_assessments_section_fk' }).onDelete('restrict'),
+  foreignKey({ columns: [t.tenantId, t.schoolId, t.sessionId, t.subjectId], foreignColumns: [academicSubjects.tenantId, academicSubjects.schoolId, academicSubjects.sessionId, academicSubjects.id], name: 'exam_assessments_subject_fk' }).onDelete('restrict'),
+  unique('exam_assessments_scope_id').on(t.tenantId, t.schoolId, t.id),
+  unique('exam_assessments_exam_id').on(t.tenantId, t.schoolId, t.examId, t.id),
+  uniqueIndex('exam_assessments_label_unique').on(t.tenantId, t.schoolId, t.examId, t.sectionId, t.subjectId, sql`upper(trim(${t.label}))`),
+  check('exam_assessments_scores_check', sql`${t.maximumScore} between 1 and 100000 and ${t.passingScore} between 0 and ${t.maximumScore}`),
+  check('exam_assessments_status_check', sql`${t.status} in ('draft', 'submitted', 'locked')`),
+  check('exam_assessments_version_check', sql`${t.version} >= 0`), tenantPolicy(t),
+]).enableRLS();
+
+export const examMarks = pgTable('exam_marks', {
+  id: uuid('id').defaultRandom().primaryKey(), tenantId: uuid('tenant_id').notNull(), schoolId: uuid('school_id').notNull(),
+  assessmentId: uuid('assessment_id').notNull(), academicEnrollmentId: uuid('academic_enrollment_id').notNull(),
+  displayName: text('display_name').notNull(), rollNumber: text('roll_number'),
+  status: text('status').notNull().default('unmarked'), score: integer('score'), revision: integer('revision').notNull().default(0),
+}, (t) => [
+  foreignKey({ columns: [t.tenantId, t.schoolId, t.assessmentId], foreignColumns: [examAssessments.tenantId, examAssessments.schoolId, examAssessments.id], name: 'exam_marks_assessment_fk' }).onDelete('restrict'),
+  foreignKey({ columns: [t.tenantId, t.schoolId, t.academicEnrollmentId], foreignColumns: [studentAcademicEnrollments.tenantId, studentAcademicEnrollments.schoolId, studentAcademicEnrollments.id], name: 'exam_marks_enrollment_fk' }).onDelete('restrict'),
+  unique('exam_marks_scope_id').on(t.tenantId, t.schoolId, t.assessmentId, t.id),
+  uniqueIndex('exam_marks_roster_unique').on(t.tenantId, t.schoolId, t.assessmentId, t.academicEnrollmentId),
+  check('exam_marks_score_check', sql`(${t.status} = 'scored' and ${t.score} is not null and ${t.score} between 0 and 100000) or (${t.status} in ('unmarked', 'absent', 'exempt') and ${t.score} is null)`),
+  check('exam_marks_revision_check', sql`${t.revision} >= 0`), tenantPolicy(t),
+]).enableRLS();
+
+export const examCorrections = pgTable('exam_corrections', {
+  id: uuid('id').defaultRandom().primaryKey(), tenantId: uuid('tenant_id').notNull(), schoolId: uuid('school_id').notNull(),
+  assessmentId: uuid('assessment_id').notNull(), markId: uuid('mark_id').notNull(), baseRevision: integer('base_revision').notNull(),
+  previousStatus: text('previous_status').notNull(), previousScore: integer('previous_score'),
+  proposedStatus: text('proposed_status').notNull(), proposedScore: integer('proposed_score'), reason: text('reason').notNull(),
+  status: text('status').notNull().default('pending'), requestedByAccountId: uuid('requested_by_account_id').notNull(),
+  requestedByMembershipId: uuid('requested_by_membership_id').notNull(), decidedByAccountId: uuid('decided_by_account_id'),
+  decisionReason: text('decision_reason'), createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  foreignKey({ columns: [t.tenantId, t.schoolId, t.assessmentId, t.markId], foreignColumns: [examMarks.tenantId, examMarks.schoolId, examMarks.assessmentId, examMarks.id], name: 'exam_corrections_mark_fk' }).onDelete('restrict'),
+  foreignKey({ columns: [t.tenantId, t.requestedByMembershipId], foreignColumns: [memberships.tenantId, memberships.id], name: 'exam_corrections_requester_membership_fk' }).onDelete('restrict'),
+  foreignKey({ columns: [t.requestedByAccountId, t.requestedByMembershipId], foreignColumns: [memberships.accountId, memberships.id], name: 'exam_corrections_requester_fk' }).onDelete('restrict'),
+  uniqueIndex('exam_corrections_pending_unique').on(t.tenantId, t.schoolId, t.markId).where(sql`${t.status} = 'pending'`),
+  check('exam_corrections_status_check', sql`${t.status} in ('pending', 'approved', 'rejected')`),
+  check('exam_corrections_proposal_check', sql`(${t.proposedStatus} = 'scored' and ${t.proposedScore} is not null and ${t.proposedScore} between 0 and 100000) or (${t.proposedStatus} in ('absent', 'exempt') and ${t.proposedScore} is null)`),
+  check('exam_corrections_separation_check', sql`${t.decidedByAccountId} is null or ${t.decidedByAccountId} <> ${t.requestedByAccountId}`), tenantPolicy(t),
+]).enableRLS();
+
+export const examEvents = pgTable('exam_events', {
+  id: uuid('id').defaultRandom().primaryKey(), tenantId: uuid('tenant_id').notNull(), schoolId: uuid('school_id').notNull(),
+  examId: uuid('exam_id').notNull(), assessmentId: uuid('assessment_id'), eventType: text('event_type').notNull(),
+  details: jsonb('details').$type<Record<string, unknown>>().notNull(), actorAccountId: uuid('actor_account_id').notNull(),
+  actorMembershipId: uuid('actor_membership_id').notNull(), requestId: text('request_id').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  foreignKey({ columns: [t.tenantId, t.schoolId, t.examId], foreignColumns: [exams.tenantId, exams.schoolId, exams.id], name: 'exam_events_exam_fk' }).onDelete('restrict'),
+  foreignKey({ columns: [t.tenantId, t.schoolId, t.examId, t.assessmentId], foreignColumns: [examAssessments.tenantId, examAssessments.schoolId, examAssessments.examId, examAssessments.id], name: 'exam_events_assessment_fk' }).onDelete('restrict'),
+  foreignKey({ columns: [t.tenantId, t.actorMembershipId], foreignColumns: [memberships.tenantId, memberships.id], name: 'exam_events_membership_fk' }).onDelete('restrict'),
+  foreignKey({ columns: [t.actorAccountId, t.actorMembershipId], foreignColumns: [memberships.accountId, memberships.id], name: 'exam_events_actor_fk' }).onDelete('restrict'),
+  index('exam_events_history_idx').on(t.tenantId, t.schoolId, t.examId, t.createdAt), tenantPolicy(t),
+]).enableRLS();

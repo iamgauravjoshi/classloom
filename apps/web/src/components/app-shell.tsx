@@ -98,6 +98,9 @@ function SidebarContents({ onNavigate }: { onNavigate?: () => void }) {
         <Link href="/attendance" className={`nav-row ${pathname.startsWith("/attendance") ? "nav-row-active" : ""}`} aria-current={pathname.startsWith("/attendance") ? "page" : undefined} onClick={onNavigate}>
           <ClipboardCheck size={18} /><span>Attendance</span><ChevronRight className="nav-chevron" size={16} />
         </Link>
+        <Link href="/examinations" className={`nav-row ${pathname.startsWith("/examinations") ? "nav-row-active" : ""}`} aria-current={pathname.startsWith("/examinations") ? "page" : undefined} onClick={onNavigate}>
+          <ClipboardList size={18} /><span>Examinations</span><ChevronRight className="nav-chevron" size={16} />
+        </Link>
         <Link href="/staff" className={`nav-row ${pathname === "/staff" ? "nav-row-active" : ""}`} aria-current={pathname === "/staff" ? "page" : undefined} onClick={onNavigate}>
           <GraduationCap size={18} /><span>Teachers & Staff</span><ChevronRight className="nav-chevron" size={16} />
         </Link>
@@ -114,7 +117,7 @@ function SidebarContents({ onNavigate }: { onNavigate?: () => void }) {
         <Link href="/fees" className={`nav-row ${pathname.startsWith("/fees") ? "nav-row-active" : ""}`} aria-current={pathname.startsWith("/fees") ? "page" : undefined} onClick={onNavigate}>
           <Wallet size={18} /><span>Fees & Payments</span><ChevronRight className="nav-chevron" size={16} />
         </Link>
-        {upcomingSections.filter((section) => !["classes", "teachers", "students", "parents", "attendance", "fees"].includes(section.icon)).map((section) => {
+        {upcomingSections.filter((section) => !["classes", "teachers", "students", "parents", "attendance", "fees", "exams"].includes(section.icon)).map((section) => {
           const Icon = sectionIcons[section.icon];
           return (
             <div
