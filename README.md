@@ -146,16 +146,6 @@ classloom/
 
 Contains the ClassLoom Next.js frontend.
 
-Frontend-specific development instructions are defined in:
-
-```text
-apps/web/AGENTS.md
-```
-
-Read this file before making changes to the web application.
-
-It is the source of frontend-specific working guidance, including shadcn and React skills, UI component consistency, date handling, and deterministic sample data. The web app README summarizes local commands and links to the implemented flows.
-
 ---
 
 ### `apps/api`
@@ -807,12 +797,6 @@ The frontend application lives in:
 apps/web
 ```
 
-Before modifying frontend code, read:
-
-```text
-apps/web/AGENTS.md
-```
-
 Frontend authorization checks should improve user experience but must never replace backend authorization.
 
 For example, hiding a button is not a security control:
@@ -1086,7 +1070,6 @@ contains repository-wide engineering and architecture rules.
 More specific directories may contain their own instructions:
 
 ```text
-apps/web/AGENTS.md
 apps/api/AGENTS.md
 packages/db/AGENTS.md
 ```
