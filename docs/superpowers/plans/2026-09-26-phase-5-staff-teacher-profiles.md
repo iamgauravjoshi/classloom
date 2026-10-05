@@ -17,8 +17,6 @@
 - Keep existing academic assignment membership IDs and historical rows intact.
 - Require an active linked teacher affiliation, membership, account, and school grant for new assignments.
 - Use authenticated tenant context, forced RLS, composite tenant foreign keys, and API-side school permissions.
-- Use shadcn's existing `base-nova` Base UI components, the shadcn MCP for registry inspection, and no Radix or unrelated UI library.
-- Follow `apps/web/AGENTS.md`: read installed Next.js documentation before React changes and apply `vercel-react-best-practices`.
 - Use TDD for each behavior change; commit each independently tested task.
 
 ## Review Focus
@@ -34,6 +32,7 @@
 ### Task 1: Schema, authorization catalog, and migration
 
 **Files:**
+
 - Modify: `packages/db/src/schema.ts`
 - Modify: `packages/db/src/authorization-catalog.ts`
 - Create: `packages/db/src/staff-schema.integration.spec.ts`
@@ -41,6 +40,7 @@
 - Test: `packages/db/src/authorization-catalog.spec.ts`, `packages/db/src/authorization-seeding.spec.ts`
 
 **Interfaces:**
+
 - Produces: `staffProfiles`, `staffSchoolAffiliations`, and `teacherProfiles` Drizzle tables, and `staff.read` / `staff.manage` catalog keys.
 - `staff_profiles`: `id`, `tenantId`, `staffCode`, `givenName`, `familyName`, `preferredName`, `workEmail`, `phone`, `membershipId`, timestamps; case-insensitive unique `(tenantId, upper(trim(staffCode)))` and unique non-null `(tenantId, membershipId)`.
 - `staff_school_affiliations`: `id`, `tenantId`, `staffId`, `schoolId`, `designation`, `startDate`, `kind`, `status`, timestamps; unique `(tenantId, staffId, schoolId)`.
@@ -56,12 +56,14 @@
 ### Task 2: Staff directory and creation persistence
 
 **Files:**
+
 - Create: `packages/db/src/staff.ts`
 - Create: `packages/db/src/staff.spec.ts`
 - Create: `packages/db/src/staff.integration.spec.ts`
 - Modify: `packages/db/src/index.ts`
 
 **Interfaces:**
+
 - Produces: `StaffScope = { tenantId: string; schoolId: string }`, `StaffCreateInput`, `StaffListFilters`, `StaffListPage`, `createStaffProfile(tx: TenantTransaction, scope: StaffScope, input: StaffCreateInput, audit: { actorAccountId: string; requestId?: string })`, `listSchoolStaff(tx, scope, filters)`, `readSchoolStaff(tx, scope, staffId)`, and `StaffError` with `NOT_FOUND | CONFLICT | INVALID` codes.
 - `StaffCreateInput` separates `profile`, `affiliation`, and optional `teacher` fields; creation writes all provided records and the audit event atomically. Listing returns only the selected school's affiliations, ordered by normalized name then ID, with bounded cursor pagination.
 
@@ -76,12 +78,14 @@
 ### Task 3: Affiliation, teacher, and account-link rules
 
 **Files:**
+
 - Modify: `packages/db/src/staff.ts`
 - Modify: `packages/db/src/staff.integration.spec.ts`
 - Create: `apps/api/src/people/people.service.ts`
 - Create: `apps/api/src/people/people.service.spec.ts`
 
 **Interfaces:**
+
 - Produces: `updateStaffProfile`, `updateStaffAffiliation`, `addStaffAffiliation`, `upsertTeacherProfile`, `linkStaffMembership`, `unlinkStaffMembership`, `listEligibleStaffAccounts`, and `isAssignableTeacher(tx, scope, membershipId)` persistence operations; each mutator receives actor ID/request ID for an atomic audit event.
 - Produces: `PeopleService` methods that check `staff.read` / `staff.manage` on the requested school using `AuthorizationService`; shared profile/teacher/account edits check `staff.manage` on every affiliated school. Detail responses expose `canEditShared: boolean` for UI controls. `canAssignTeacher(tx, scope, membershipId): Promise<boolean>` is the Academics-facing contract.
 
@@ -96,12 +100,14 @@
 ### Task 4: People API and error contracts
 
 **Files:**
+
 - Create: `apps/api/src/people/people.controller.ts`
 - Create: `apps/api/src/people/people.module.ts`
 - Create: `apps/api/src/people/people.e2e-spec.ts`
 - Modify: `apps/api/src/app.module.ts`
 
 **Interfaces:**
+
 - Produces the REST routes in the spec under `/api/v1/people/schools/:schoolId/`, plus `GET /api/v1/people/schools` filtered by `staff.read`, with Zod schemas and `parseRequest` field errors. All mutations use `AuthGuard` and `CsrfGuard`; reads use `AuthGuard`.
 - `PeopleModule` exports `PeopleService`; controllers map `StaffError` to 404/409/400 and never return raw SQL errors.
 
@@ -114,12 +120,14 @@
 ### Task 5: Academic assignment integration
 
 **Files:**
+
 - Modify: `apps/api/src/academics/academics.controller.ts`
 - Modify: `apps/api/src/academics/academics.module.ts`
 - Modify: `packages/db/src/academics.ts`
 - Modify: `apps/api/src/academics/academics.e2e-spec.ts`
 
 **Interfaces:**
+
 - Consumes: `PeopleService.canAssignTeacher(tx, { tenantId, schoolId }, membershipId)` from Task 3.
 - Produces: the existing `GET /academics/schools/:schoolId/staff` shape (`id`, `email`, `displayName`) restricted to eligible linked teachers for new selection, and an `assignmentAccounts` array in `GET .../setup` containing (`id`, `email`, `displayName`) for every historical assignment membership, including inactive or unprofiled ones.
 
@@ -132,6 +140,7 @@
 ### Task 6: Staff and teacher web UI
 
 **Files:**
+
 - Create: `apps/web/src/lib/staff-api.ts`
 - Create: `apps/web/src/lib/staff-api.test.ts`
 - Create: `apps/web/src/app/api/people/[...path]/route.ts`
@@ -143,6 +152,7 @@
 - Modify: `apps/web/src/lib/navigation.ts` if its upcoming Teachers entry must become a live route
 
 **Interfaces:**
+
 - Consumes: People API routes from Task 4 and eligible teacher response from Task 5.
 - Produces: a protected `/staff` directory with school selection, search/filter/pagination, profile view, creation/editing, affiliation/teacher/account actions, and clear loading/empty/error/success states.
 
@@ -157,6 +167,7 @@
 ### Task 7: Documentation and final verification
 
 **Files:**
+
 - Modify: `README.md`
 - Modify: `docs/architecture/module-boundaries.md`
 - Modify: `docs/architecture/identity-and-access.md`

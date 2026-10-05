@@ -38,6 +38,7 @@
 ### Task 1: Permission catalog, schema, and migration
 
 **Files:**
+
 - Modify: `packages/db/src/schema.ts`
 - Modify: `packages/db/src/authorization-catalog.ts`
 - Modify: `packages/db/src/authorization-catalog.spec.ts`
@@ -47,6 +48,7 @@
 - Modify: `packages/db/drizzle/meta/_journal.json`
 
 **Interfaces:**
+
 - Consumes: existing tenant, school, membership, academic-session, class, section, permission, role, and audit tables.
 - Produces: `studentProfiles`, `guardianProfiles`, `studentGuardianRelationships`, `studentSchoolEnrollments`, `studentAcademicEnrollments`, and `studentImportBatches`; permission keys `student.read`, `student.manage`, `guardian.read`, `guardian.manage`, `enrollment.read`, and `enrollment.manage`.
 
@@ -60,6 +62,7 @@
 ### Task 2: People persistence and transaction-aware student contract
 
 **Files:**
+
 - Create: `packages/db/src/students.ts`
 - Create: `packages/db/src/students.spec.ts`
 - Create: `packages/db/src/students.integration.spec.ts`
@@ -69,6 +72,7 @@
 - Modify: `apps/api/src/people/people.module.ts`
 
 **Interfaces:**
+
 - Consumes: Task 1 tables and permission keys plus `TenantTransaction`.
 - Produces: `StudentScope`, `StudentProfileInput`, `GuardianProfileInput`, `GuardianRelationshipInput`, `StudentPeopleActor`; normalization and CRUD functions; `StudentPeopleService.requireStudentRead`, `requireStudentManage`, `requireGuardianRead`, `requireGuardianManage`, `requireSharedStudentManage`, `requireSharedGuardianManage`, `createOrResolveStudent`, `createOrResolveGuardian`, and `createOrResolveRelationship`.
 
@@ -83,6 +87,7 @@
 ### Task 3: Enrollment persistence, academic contract, and concurrency
 
 **Files:**
+
 - Create: `packages/db/src/enrollment.ts`
 - Create: `packages/db/src/enrollment.spec.ts`
 - Create: `packages/db/src/enrollment.integration.spec.ts`
@@ -97,6 +102,7 @@
 - Modify: `apps/api/src/app.module.ts`
 
 **Interfaces:**
+
 - Consumes: Task 1 enrollment tables; Task 2 `StudentPeopleService`; existing academic tables.
 - Produces: `resolveEnrollmentPlacement(tx, scope, { sessionId, classId, sectionId })`; `createSchoolEnrollment`, `createAcademicEnrollment`, `transferAcademicEnrollment`, `withdrawAcademicEnrollment`, `completeAcademicEnrollment`, and history queries; exported `AcademicsService.requireEnrollmentPlacement`; exported `EnrollmentService` workflow methods.
 
@@ -111,6 +117,7 @@
 ### Task 4: Student, guardian, and enrollment HTTP APIs
 
 **Files:**
+
 - Create: `apps/api/src/enrollment/student-directory.controller.ts`
 - Create: `apps/api/src/enrollment/guardian-directory.controller.ts`
 - Create: `apps/api/src/enrollment/enrollment.controller.ts`
@@ -118,6 +125,7 @@
 - Modify: `apps/api/src/enrollment/enrollment.module.ts`
 
 **Interfaces:**
+
 - Consumes: Task 2 `StudentPeopleService`, Task 3 `EnrollmentService`, AuthGuard, CsrfGuard, AuthorizationService, and the existing error envelope.
 - Produces: every non-import People and Enrollment route declared in the spec, with bounded cursor filters and field-specific Zod validation.
 
@@ -131,6 +139,7 @@
 ### Task 5: CSV parser, preview, atomic commit, and import API
 
 **Files:**
+
 - Modify: `apps/api/package.json`
 - Modify: `pnpm-lock.yaml`
 - Create: `apps/api/src/enrollment/student-import.ts`
@@ -145,6 +154,7 @@
 - Modify: `packages/db/src/index.ts`
 
 **Interfaces:**
+
 - Consumes: Tasks 2–4 People, Academics, Enrollment, authorization, and audit contracts.
 - Produces: `inspectStudentCsv`, `previewStudentCsv`, `StudentImportService.commit`, import-batch idempotency helpers, and the three multipart import endpoints.
 
@@ -160,6 +170,7 @@
 ### Task 6: Deterministic Faker development seeder
 
 **Files:**
+
 - Modify: `packages/db/package.json`
 - Modify: `package.json`
 - Modify: `pnpm-lock.yaml`
@@ -168,6 +179,7 @@
 - Modify: `.env.example` only if the existing environment contract needs a documented non-secret seed option.
 
 **Interfaces:**
+
 - Consumes: Phase 6 database commands, `DATABASE_PROVISIONER_URL`, explicit `--tenant`, `--school`, and optional `--seed` arguments.
 - Produces: `pnpm db:seed-phase6-demo -- --tenant <slug-or-id> --school <code-or-id> [--seed 26092026]` and exported deterministic fixture builders for tests.
 
@@ -181,6 +193,7 @@
 ### Task 7: Web API clients, same-origin proxy, and shadcn primitives
 
 **Files:**
+
 - Create: `apps/web/src/app/api/enrollment/[...path]/route.ts`
 - Extend: `apps/web/src/app/api/people/[...path]/route.ts`
 - Create: `apps/web/src/lib/students-api.ts`
@@ -198,6 +211,7 @@
 - Modify only if generated dependencies require it: `apps/web/package.json`, `pnpm-lock.yaml`
 
 **Interfaces:**
+
 - Consumes: Task 4 and 5 HTTP contracts, existing `responseError`, session cookie forwarding, and CSRF conventions.
 - Produces: typed browser clients for all Phase 6 routes and reviewed Base UI primitives.
 
@@ -213,6 +227,7 @@
 ### Task 8: Student and guardian directories, forms, and profiles
 
 **Files:**
+
 - Create: `apps/web/src/app/students/page.tsx`
 - Create: `apps/web/src/app/students/students-client.tsx`
 - Create: `apps/web/src/app/students/students-client.test.tsx`
@@ -227,6 +242,7 @@
 - Modify: `apps/web/src/components/app-shell.tsx`
 
 **Interfaces:**
+
 - Consumes: Task 7 clients and shadcn primitives plus the existing protected-page/session and date-field patterns.
 - Produces: `/students`, `/students/new`, `/students/[studentId]`, `/guardians`, and `/guardians/[guardianId]` flows.
 
@@ -240,6 +256,7 @@
 ### Task 9: CSV import interface
 
 **Files:**
+
 - Create: `apps/web/src/app/students/import/page.tsx`
 - Create: `apps/web/src/app/students/import/student-import-client.tsx`
 - Create: `apps/web/src/app/students/import/student-import-client.test.tsx`
@@ -247,6 +264,7 @@
 - Create: `apps/web/src/app/students/import/import-preview.tsx`
 
 **Interfaces:**
+
 - Consumes: Task 7 import client and Base UI components; Task 8 school context/navigation patterns.
 - Produces: Upload → Map Columns → Preview and Fix → Import Result workflow.
 
@@ -259,6 +277,7 @@
 ### Task 10: Documentation, final audit, and GitHub integration
 
 **Files:**
+
 - Modify: `README.md`
 - Modify: `docs/architecture/module-boundaries.md`
 - Modify: `docs/architecture/multi-tenancy.md`
@@ -270,6 +289,7 @@
 - Modify: this plan's checkboxes as tasks complete.
 
 **Interfaces:**
+
 - Consumes: all prior Phase 6 deliverables.
 - Produces: operational documentation, architecture record, verified branch, published GitHub branch, and final merge to `main`.
 
