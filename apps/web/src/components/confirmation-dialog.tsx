@@ -1,5 +1,7 @@
 "use client";
 
+import { useRef } from "react";
+
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,34 +16,54 @@ import {
 
 export function ConfirmationDialog({
   triggerLabel,
+  triggerAccessibleLabel,
   title,
   description,
   confirmLabel,
   onConfirm,
   disabled = false,
+  destructive = false,
 }: {
   triggerLabel: string;
+  triggerAccessibleLabel?: string;
   title: string;
   description: string;
   confirmLabel: string;
   onConfirm: () => void;
   disabled?: boolean;
+  destructive?: boolean;
 }) {
+  const cancel = useRef<HTMLButtonElement>(null);
   return (
     <Dialog>
-      <DialogTrigger render={<Button disabled={disabled} />}>
+      <DialogTrigger
+        render={
+          <Button
+            variant="outline"
+            disabled={disabled}
+            aria-label={triggerAccessibleLabel}
+          />
+        }
+      >
         {triggerLabel}
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent initialFocus={cancel}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <DialogClose render={<Button variant="outline" />}>
+          <DialogClose render={<Button ref={cancel} variant="outline" />}>
             Cancel
           </DialogClose>
-          <DialogClose render={<Button onClick={onConfirm} />}>
+          <DialogClose
+            render={
+              <Button
+                variant={destructive ? "destructive" : "default"}
+                onClick={onConfirm}
+              />
+            }
+          >
             {confirmLabel}
           </DialogClose>
         </DialogFooter>

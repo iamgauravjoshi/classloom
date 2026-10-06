@@ -2,6 +2,8 @@
 
 Use this guide for ClassLoom’s school management web app. Design for school staff, students, and guardians who need to understand school information and complete real tasks quickly. Product scope and behavior come from `docs/product/` and `docs/architecture/`. Use the PreSkool reference for useful admin patterns, such as tables and forms, while adapting them to ClassLoom’s workflow and design system instead of copying its surface style.
 
+The implemented tokens, component patterns, responsive contracts, and screen inventory are documented in [the product design system](docs/development/design-system.md).
+
 ## Product Principles
 
 - Make the user’s school context, academic year or term, page purpose, and primary action clear.
