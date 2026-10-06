@@ -24,7 +24,7 @@ describe('AuthorizationService', () => {
       isScopeInTenant,
     });
     expect(await service.hasPermissions(context, ['school.read'])).toBe(false);
-    expect(await service.hasPermissions(context, ['results.publish'], { kind: 'school', schoolId: 'school-a' })).toBe(false);
+    expect(await service.hasPermissions(context, ['results.publish'])).toBe(false);
     expect(isScopeInTenant).not.toHaveBeenCalled();
     expect(await service.hasPermissions(context, ['school.read'], { kind: 'school', schoolId: 'school-a' })).toBe(true);
     isScopeInTenant.mockResolvedValueOnce(false);

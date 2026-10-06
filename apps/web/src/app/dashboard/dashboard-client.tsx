@@ -74,6 +74,22 @@ export function DashboardClient({ name }: { name: string }) {
 
   const tasks = [
     {
+      title: "Results & report cards",
+      description: "Review result editions and publish approved report cards.",
+      action: "Open results",
+      href: "/results",
+      icon: GraduationCap,
+      visible: access.results.schools.length > 0,
+    },
+    {
+      title: "My report cards",
+      description: "Read current published reports for your linked student profiles.",
+      action: "View my report cards",
+      href: "/report-cards",
+      icon: GraduationCap,
+      visible: access.results.canReadOwn,
+    },
+    {
       title: "Attendance",
       description: "Open a class register and record today's outcomes.",
       action: access.attendance.some((s) => s.canRecordAttendance)

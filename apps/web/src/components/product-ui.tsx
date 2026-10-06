@@ -213,6 +213,10 @@ const statusTones: Record<
   reversed: "destructive",
   excused: "info",
   exempt: "info",
+  passed: "success",
+  failed: "destructive",
+  incomplete: "warning",
+  withdrawn: "destructive",
   enquiry: "info",
   linked: "info",
 };

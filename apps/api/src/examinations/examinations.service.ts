@@ -3,6 +3,7 @@ import {
   withTenantContext, listAttendanceSchools, getAttendanceSchool, ExaminationError,
   createExam, addAssessment, getExam, getAssessment, listExams, listAssessments, openExam, completeExam,
   readExamSheet, saveExamMarks, transitionExamSheet, requestExamCorrection, decideExamCorrection,
+  readResultExamSource,
   type ExamActor, type MarkInput, type MarkValue, type PermissionKey, type TenantTransaction,
 } from '@classloom/db';
 import { DatabaseService } from '../database/database.service.js';
@@ -15,6 +16,8 @@ import { schoolLocalDate } from '../attendance/attendance.service.js';
 export type ExaminationActor = ExamActor & { tenantId: string };
 @Injectable()
 export class ExaminationsService {
+  resultSource(tx: TenantTransaction, scope: { tenantId: string; schoolId: string }, examId: string) { return readResultExamSource(tx, scope, examId); }
+  resultExams(tx: TenantTransaction, scope: { tenantId: string; schoolId: string }) { return listExams(tx, scope); }
   constructor(
     @Inject(DatabaseService) private readonly database: DatabaseService,
     @Inject(AuthorizationService) private readonly authorization: AuthorizationService,

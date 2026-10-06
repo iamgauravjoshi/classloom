@@ -649,3 +649,73 @@ export async function listEligibleGuardianAccounts(tx: TenantTransaction, tenant
       sql`${guardianProfiles.id} is null`,
     )).orderBy(asc(accounts.normalizedEmail));
 }
+
+/** People owns the current identity relationship used for published report access. */
+export async function reportAccessStudentIds(
+  tx: TenantTransaction,
+  tenantId: string,
+  membershipId: string,
+) {
+  const direct = await tx
+    .select({ id: studentProfiles.id })
+    .from(studentProfiles)
+    .where(
+      and(
+        eq(studentProfiles.tenantId, tenantId),
+        eq(studentProfiles.membershipId, membershipId),
+        eq(studentProfiles.status, 'active'),
+      ),
+    );
+  const children = await tx
+    .select({ id: studentProfiles.id })
+    .from(studentGuardianRelationships)
+    .innerJoin(
+      guardianProfiles,
+      and(
+        eq(guardianProfiles.tenantId, studentGuardianRelationships.tenantId),
+        eq(guardianProfiles.id, studentGuardianRelationships.guardianId),
+      ),
+    )
+    .innerJoin(
+      studentProfiles,
+      and(
+        eq(studentProfiles.tenantId, studentGuardianRelationships.tenantId),
+        eq(studentProfiles.id, studentGuardianRelationships.studentId),
+      ),
+    )
+    .where(
+      and(
+        eq(studentGuardianRelationships.tenantId, tenantId),
+        eq(guardianProfiles.membershipId, membershipId),
+        eq(guardianProfiles.status, 'active'),
+        eq(studentProfiles.status, 'active'),
+        eq(studentGuardianRelationships.status, 'active'),
+        eq(studentGuardianRelationships.portalAccess, true),
+      ),
+    );
+  return [...new Set([...direct, ...children].map((r) => r.id))];
+}
+export function readResultStudentIdentities(
+  tx: TenantTransaction,
+  tenantId: string,
+  ids: string[],
+) {
+  return ids.length
+    ? tx
+        .select({
+          id: studentProfiles.id,
+          code: studentProfiles.studentCode,
+          givenName: studentProfiles.givenName,
+          middleName: studentProfiles.middleName,
+          familyName: studentProfiles.familyName,
+          dateOfBirth: studentProfiles.dateOfBirth,
+        })
+        .from(studentProfiles)
+        .where(
+          and(
+            eq(studentProfiles.tenantId, tenantId),
+            inArray(studentProfiles.id, ids),
+          ),
+        )
+    : Promise.resolve([]);
+}

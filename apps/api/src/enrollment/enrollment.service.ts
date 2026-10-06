@@ -9,6 +9,7 @@ import {
   lockFinanceEnrollment,
   listFinanceEnrollments,
   hasFinancePlacement,
+  resolveResultEnrollments,
   type AcademicEnrollmentInput,
   type EnrollmentCloseInput,
   type EnrollmentPlacementInput,
@@ -57,6 +58,9 @@ const defaultPersistence: EnrollmentPersistence = {
 
 @Injectable()
 export class EnrollmentService {
+  resolveResultRoster(tx: TenantTransaction, scope: { tenantId: string; schoolId: string }, ids: string[]) {
+    return resolveResultEnrollments(tx, scope, ids);
+  }
   constructor(
     @Inject(AuthorizationService) private readonly authorization: AuthorizationService,
     @Inject(StudentPeopleService) readonly people: StudentPeopleService,

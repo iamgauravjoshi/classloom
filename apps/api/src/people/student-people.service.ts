@@ -9,6 +9,8 @@ import {
   readStudentProfile,
   readGuardianProfile,
   StudentPeopleError,
+  reportAccessStudentIds,
+  readResultStudentIdentities,
   type GuardianProfileInput,
   type GuardianRelationshipInput,
   type StudentPeopleAudit,
@@ -43,6 +45,8 @@ const defaultPersistence: StudentPeoplePersistence = {
 
 @Injectable()
 export class StudentPeopleService {
+  reportAccess(tx: TenantTransaction, tenantId: string, membershipId: string) { return reportAccessStudentIds(tx, tenantId, membershipId); }
+  resultIdentities(tx: TenantTransaction, tenantId: string, ids: string[]) { return readResultStudentIdentities(tx, tenantId, ids); }
   constructor(@Inject(AuthorizationService) private readonly authorization: AuthorizationService) {}
 
   private async require(actor: StudentPeopleActor, schoolId: string, permission: 'student.read' | 'student.manage' | 'guardian.read' | 'guardian.manage', message: string) {

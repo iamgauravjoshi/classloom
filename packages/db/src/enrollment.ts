@@ -447,3 +447,44 @@ export async function listSchoolGuardianIds(tx: TenantTransaction, scope: Enroll
   ));
   return rows.map((row) => row.guardianId);
 }
+
+/** Results contract: immutable examination roster references, including historic placements. */
+export async function resolveResultEnrollments(
+  tx: TenantTransaction,
+  scope: EnrollmentScope,
+  ids: string[],
+) {
+  if (!ids.length) return [];
+  return tx
+    .select({
+      academicEnrollmentId: studentAcademicEnrollments.id,
+      studentId: studentAcademicEnrollments.studentId,
+      schoolEnrollmentId: studentAcademicEnrollments.schoolEnrollmentId,
+      admissionNumber: studentSchoolEnrollments.admissionNumber,
+    })
+    .from(studentAcademicEnrollments)
+    .innerJoin(
+      studentSchoolEnrollments,
+      and(
+        eq(
+          studentSchoolEnrollments.tenantId,
+          studentAcademicEnrollments.tenantId,
+        ),
+        eq(
+          studentSchoolEnrollments.schoolId,
+          studentAcademicEnrollments.schoolId,
+        ),
+        eq(
+          studentSchoolEnrollments.id,
+          studentAcademicEnrollments.schoolEnrollmentId,
+        ),
+      ),
+    )
+    .where(
+      and(
+        eq(studentAcademicEnrollments.tenantId, scope.tenantId),
+        eq(studentAcademicEnrollments.schoolId, scope.schoolId),
+        inArray(studentAcademicEnrollments.id, ids),
+      ),
+    );
+}

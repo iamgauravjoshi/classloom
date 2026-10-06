@@ -17,6 +17,7 @@ const api = vi.hoisted(() => ({
   admissions: vi.fn(),
   finance: vi.fn(),
   examinations: vi.fn(),
+  results: vi.fn(),
 }));
 vi.mock("@/lib/students-api", () => ({ listPeopleSchools: api.people }));
 vi.mock("@/lib/academics-api", () => ({ listAcademicSchools: api.academic }));
@@ -31,6 +32,7 @@ vi.mock("@/lib/finance-api", () => ({ listFinanceSchools: api.finance }));
 vi.mock("@/lib/examinations-api", () => ({
   listExamSchools: api.examinations,
 }));
+vi.mock("@/lib/results-api", () => ({ resultAccess: api.results }));
 
 function WorkspaceProbe() {
   const workspace = useWorkspace();
@@ -46,6 +48,7 @@ function WorkspaceProbe() {
 
 beforeEach(() => {
   for (const read of Object.values(api)) read.mockResolvedValue([]);
+  api.results.mockResolvedValue({ schools: [], canReadOwn: false });
 });
 afterEach(() => {
   cleanup();

@@ -24,6 +24,7 @@ import {
 } from "@/lib/admissions-api";
 import { listFinanceSchools, type FinanceSchool } from "@/lib/finance-api";
 import { listExamSchools, type ExamSchool } from "@/lib/examinations-api";
+import { resultAccess, type ResultAccess } from "@/lib/results-api";
 
 type WorkspaceData = {
   people: PeopleSchool[];
@@ -33,6 +34,7 @@ type WorkspaceData = {
   admissions: AdmissionSchool[];
   finance: FinanceSchool[];
   examinations: ExamSchool[];
+  results: ResultAccess;
 };
 const empty: WorkspaceData = {
   people: [],
@@ -42,6 +44,7 @@ const empty: WorkspaceData = {
   admissions: [],
   finance: [],
   examinations: [],
+  results: { schools: [], canReadOwn: false },
 };
 type Workspace = WorkspaceData & {
   loading: boolean;
@@ -66,6 +69,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       admissions: listAdmissionSchools,
       finance: listFinanceSchools,
       examinations: listExamSchools,
+      results: resultAccess,
     };
     // Each endpoint returns only schools allowed by the active server membership.
     Promise.allSettled(Object.values(sources).map((read) => read())).then(

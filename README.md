@@ -30,9 +30,9 @@ The foundation includes tenant-isolated PostgreSQL data, email/password accounts
 
 ---
 
-## Implemented through Phase 11
+## Implemented through Phase 12
 
-Phase 9 adds daily Attendance with date-effective enrollment rosters and audited changes. Phase 10 adds Fees & Payments with charge snapshots, concessions, offline receipts, and reversals. Phase 11 adds Examinations with section/subject assessments, roster snapshots, versioned marks entry, submission/review/locking, and corrections approved by another account. After signing in, open `/attendance`, `/fees`, or `/examinations`. See [Attendance](docs/product/phase-9-attendance.md), [Fees & Payments](docs/development/fees-payments.md), [Examinations](docs/development/examinations.md), and [ADR-0009](docs/decisions/ADR-0009-examination-rosters-and-reviewed-marks.md). Result calculation and report cards are the next Phase 12 scope.
+Phase 9 adds daily Attendance with date-effective enrollment rosters and audited changes. Phase 10 adds Fees & Payments with charge snapshots, concessions, offline receipts, and reversals. Phase 11 adds Examinations with section/subject assessments, roster snapshots, versioned marks entry, submission/review/locking, and corrections approved by another account. After signing in, open `/attendance`, `/fees`, or `/examinations`. See [Attendance](docs/product/phase-9-attendance.md), [Fees & Payments](docs/development/fees-payments.md), [Examinations](docs/development/examinations.md), and [ADR-0009](docs/decisions/ADR-0009-examination-rosters-and-reviewed-marks.md). Phase 12 adds configurable grading policy revisions, exact results, staff remarks, separate-account approval, reviewed publication, private PDF downloads, and current published report access for linked students and eligible guardians. Open `/results` or `/report-cards`; see [Results & Report Cards](docs/development/results-report-cards.md) and [ADR-0010](docs/decisions/ADR-0010-reviewed-result-editions-and-personal-report-access.md). Phase 13 is Communication & Notifications.
 
 ## Core Goals
 

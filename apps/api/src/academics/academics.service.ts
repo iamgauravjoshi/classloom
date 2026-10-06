@@ -1,11 +1,12 @@
 import { Inject, Injectable, Optional } from '@nestjs/common';
-import { AcademicSetupError, readAcademicSetup, resolveEnrollmentPlacement, resolveEnrollmentPlacementByCodes, type EnrollmentPlacementInput, type TenantTransaction } from '@classloom/db';
+import { AcademicSetupError, listAcademicResultSchools, readAcademicSetup, resolveEnrollmentPlacement, resolveEnrollmentPlacementByCodes, type EnrollmentPlacementInput, type TenantTransaction } from '@classloom/db';
 import { PeopleService } from '../people/people.service.js';
 
 type AcademicScope = { tenantId: string; schoolId: string };
 
 @Injectable()
 export class AcademicsService {
+  resultSchools(tx: TenantTransaction, tenantId: string) { return listAcademicResultSchools(tx, tenantId); }
   private readonly setupReader = readAcademicSetup;
 
   constructor(
