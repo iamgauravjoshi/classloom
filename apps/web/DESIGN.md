@@ -2,6 +2,8 @@
 
 > Design standard for **Classloom**, a School Management SaaS for administrators, teachers, students, and parents.
 
+Implementation reference: [product design system](../../docs/development/design-system.md). Its semantic tokens and reusable patterns implement the principles in this guide.
+
 ## 1. Product Direction
 
 Classloom should feel:

@@ -36,6 +36,8 @@ Phase 9 adds daily Attendance with date-effective enrollment rosters and audited
 
 ## Core Goals
 
+The web interface uses a shared ClassLoom design system: Inter typography, semantic light/dark tokens, Base UI controls, permission-aware navigation, responsive task layouts, and consistent form feedback. See the [design system](docs/development/design-system.md) and [UI review](docs/development/ui-review-2026-10-06.md).
+
 ClassLoom is designed around the following principles:
 
 - Multi-tenant SaaS architecture
