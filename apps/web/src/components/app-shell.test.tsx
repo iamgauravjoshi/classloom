@@ -14,6 +14,7 @@ const state = vi.hoisted(() => ({
     admissions: [{ id: "school-a", canManageAdmissions: true }],
     finance: [],
     examinations: [],
+    results: { schools: [], canReadOwn: false },
     loading: false,
     failed: [],
     retry: vi.fn(),

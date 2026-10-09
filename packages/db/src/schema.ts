@@ -1,4 +1,5 @@
 import { sql } from 'drizzle-orm';
+import type { GradeBand, ReportSnapshot } from './results-contracts.js';
 import {
   foreignKey,
   index,
@@ -1118,3 +1119,285 @@ export const examEvents = pgTable('exam_events', {
   foreignKey({ columns: [t.actorAccountId, t.actorMembershipId], foreignColumns: [memberships.accountId, memberships.id], name: 'exam_events_actor_fk' }).onDelete('restrict'),
   index('exam_events_history_idx').on(t.tenantId, t.schoolId, t.examId, t.createdAt), tenantPolicy(t),
 ]).enableRLS();
+
+export const resultGradingPolicies = pgTable(
+  'result_grading_policies',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    tenantId: uuid('tenant_id').notNull(),
+    schoolId: uuid('school_id').notNull(),
+    name: text('name').notNull(),
+    revision: integer('revision').notNull(),
+    bands: jsonb('bands').$type<GradeBand[]>().notNull(),
+    overallPassingPercentage: integer('overall_passing_percentage').notNull(),
+    requireSubjectPass: boolean('require_subject_pass').notNull(),
+    idempotencyKey: uuid('idempotency_key').notNull(),
+    actorAccountId: uuid('actor_account_id').notNull(),
+    actorMembershipId: uuid('actor_membership_id').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    foreignKey({
+      columns: [t.tenantId, t.schoolId],
+      foreignColumns: [schools.tenantId, schools.id],
+      name: 'result_policies_school_fk',
+    }).onDelete('restrict'),
+    foreignKey({
+      columns: [t.tenantId, t.actorMembershipId],
+      foreignColumns: [memberships.tenantId, memberships.id],
+      name: 'result_policies_member_fk',
+    }).onDelete('restrict'),
+    foreignKey({
+      columns: [t.actorAccountId, t.actorMembershipId],
+      foreignColumns: [memberships.accountId, memberships.id],
+      name: 'result_policies_actor_fk',
+    }).onDelete('restrict'),
+    unique('result_policies_scope_id').on(t.tenantId, t.schoolId, t.id),
+    uniqueIndex('result_policies_revision_unique').on(
+      t.tenantId,
+      t.schoolId,
+      sql`lower(trim(${t.name}))`,
+      t.revision,
+    ),
+    unique('result_policies_idempotency_unique').on(
+      t.tenantId,
+      t.schoolId,
+      t.idempotencyKey,
+    ),
+    check(
+      'result_policies_bounds',
+      sql`${t.revision} > 0 and ${t.overallPassingPercentage} between 0 and 10000 and jsonb_array_length(${t.bands}) between 2 and 20`,
+    ),
+    tenantPolicy(t),
+  ],
+).enableRLS();
+
+export const resultBatches = pgTable(
+  'result_batches',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    tenantId: uuid('tenant_id').notNull(),
+    schoolId: uuid('school_id').notNull(),
+    examId: uuid('exam_id').notNull(),
+    sessionId: uuid('session_id').notNull(),
+    classId: uuid('class_id').notNull(),
+    gradingPolicyId: uuid('grading_policy_id').notNull(),
+    edition: integer('edition').notNull(),
+    status: text('status').notNull().default('draft'),
+    version: integer('version').notNull().default(0),
+    sourceFingerprint: text('source_fingerprint').notNull(),
+    idempotencyKey: uuid('idempotency_key').notNull(),
+    requestChecksum: text('request_checksum').notNull().default(''),
+    preparedByAccountId: uuid('prepared_by_account_id').notNull(),
+    preparedByMembershipId: uuid('prepared_by_membership_id').notNull(),
+    submittedByAccountId: uuid('submitted_by_account_id'),
+    submittedByMembershipId: uuid('submitted_by_membership_id'),
+    approvedByAccountId: uuid('approved_by_account_id'),
+    approvedByMembershipId: uuid('approved_by_membership_id'),
+    publishedByAccountId: uuid('published_by_account_id'),
+    publishedByMembershipId: uuid('published_by_membership_id'),
+    publishedAt: timestamp('published_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    foreignKey({
+      columns: [t.tenantId, t.schoolId, t.sessionId, t.classId, t.examId],
+      foreignColumns: [
+        exams.tenantId,
+        exams.schoolId,
+        exams.sessionId,
+        exams.classId,
+        exams.id,
+      ],
+      name: 'result_batches_exam_fk',
+    }).onDelete('restrict'),
+    foreignKey({
+      columns: [t.tenantId, t.schoolId, t.gradingPolicyId],
+      foreignColumns: [
+        resultGradingPolicies.tenantId,
+        resultGradingPolicies.schoolId,
+        resultGradingPolicies.id,
+      ],
+      name: 'result_batches_policy_fk',
+    }).onDelete('restrict'),
+    ...(['prepared', 'submitted', 'approved', 'published'] as const).flatMap(
+      (kind) => {
+        const member = t[`${kind}ByMembershipId`],
+          account = t[`${kind}ByAccountId`];
+        return [
+          foreignKey({
+            columns: [t.tenantId, member],
+            foreignColumns: [memberships.tenantId, memberships.id],
+            name: `result_batches_${kind}_member_fk`,
+          }).onDelete('restrict'),
+          foreignKey({
+            columns: [account, member],
+            foreignColumns: [memberships.accountId, memberships.id],
+            name: `result_batches_${kind}_actor_fk`,
+          }).onDelete('restrict'),
+        ];
+      },
+    ),
+    unique('result_batches_scope_id').on(t.tenantId, t.schoolId, t.id),
+    unique('result_batches_academic_id').on(
+      t.tenantId,
+      t.schoolId,
+      t.sessionId,
+      t.classId,
+      t.id,
+    ),
+    unique('result_batches_edition_unique').on(
+      t.tenantId,
+      t.schoolId,
+      t.examId,
+      t.edition,
+    ),
+    unique('result_batches_idempotency_unique').on(
+      t.tenantId,
+      t.schoolId,
+      t.idempotencyKey,
+    ),
+    uniqueIndex('result_batches_published_unique')
+      .on(t.tenantId, t.schoolId, t.examId)
+      .where(sql`${t.status} = 'published'`),
+    check('result_batches_bounds', sql`${t.edition} > 0 and ${t.version} >= 0`),
+    check(
+      'result_batches_status',
+      sql`${t.status} in ('draft','submitted','approved','published','superseded','withdrawn')`,
+    ),
+    check(
+      'result_batches_review_actors',
+      sql`(${t.status} = 'draft' or (${t.submittedByAccountId} is not null and ${t.submittedByMembershipId} is not null)) and (${t.status} in ('draft','submitted') or (${t.approvedByAccountId} is not null and ${t.approvedByMembershipId} is not null)) and (${t.status} not in ('published','superseded','withdrawn') or (${t.publishedAt} is not null and ${t.publishedByAccountId} is not null and ${t.publishedByMembershipId} is not null))`,
+    ),
+    check(
+      'result_batches_separation',
+      sql`${t.approvedByAccountId} is null or (${t.approvedByAccountId} <> ${t.preparedByAccountId} and ${t.approvedByAccountId} <> ${t.submittedByAccountId})`,
+    ),
+    tenantPolicy(t),
+  ],
+).enableRLS();
+
+export const resultReports = pgTable(
+  'result_reports',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    tenantId: uuid('tenant_id').notNull(),
+    schoolId: uuid('school_id').notNull(),
+    batchId: uuid('batch_id').notNull(),
+    sessionId: uuid('session_id').notNull(),
+    classId: uuid('class_id').notNull(),
+    sectionId: uuid('section_id').notNull(),
+    studentId: uuid('student_id').notNull(),
+    schoolEnrollmentId: uuid('school_enrollment_id').notNull(),
+    snapshot: jsonb('snapshot').$type<ReportSnapshot>().notNull(),
+    remarks: text('remarks'),
+  },
+  (t) => [
+    foreignKey({
+      columns: [t.tenantId, t.schoolId, t.sessionId, t.classId, t.batchId],
+      foreignColumns: [
+        resultBatches.tenantId,
+        resultBatches.schoolId,
+        resultBatches.sessionId,
+        resultBatches.classId,
+        resultBatches.id,
+      ],
+      name: 'result_reports_batch_fk',
+    }).onDelete('restrict'),
+    foreignKey({
+      columns: [t.tenantId, t.schoolId, t.sessionId, t.classId, t.sectionId],
+      foreignColumns: [
+        academicSections.tenantId,
+        academicSections.schoolId,
+        academicSections.sessionId,
+        academicSections.classId,
+        academicSections.id,
+      ],
+      name: 'result_reports_section_fk',
+    }).onDelete('restrict'),
+    foreignKey({
+      columns: [t.tenantId, t.schoolId, t.studentId, t.schoolEnrollmentId],
+      foreignColumns: [
+        studentSchoolEnrollments.tenantId,
+        studentSchoolEnrollments.schoolId,
+        studentSchoolEnrollments.studentId,
+        studentSchoolEnrollments.id,
+      ],
+      name: 'result_reports_student_fk',
+    }).onDelete('restrict'),
+    unique('result_reports_scope_id').on(t.tenantId, t.schoolId, t.id),
+    unique('result_reports_roster_unique').on(
+      t.tenantId,
+      t.schoolId,
+      t.batchId,
+      t.sectionId,
+      t.studentId,
+    ),
+    index('result_reports_person_idx').on(t.tenantId, t.studentId, t.batchId),
+    check(
+      'result_reports_remarks',
+      sql`${t.remarks} is null or length(${t.remarks}) <= 1000`,
+    ),
+    tenantPolicy(t),
+  ],
+).enableRLS();
+
+export const resultEvents = pgTable(
+  'result_events',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    tenantId: uuid('tenant_id').notNull(),
+    schoolId: uuid('school_id').notNull(),
+    batchId: uuid('batch_id'),
+    policyId: uuid('policy_id'),
+    eventType: text('event_type').notNull(),
+    details: jsonb('details').$type<Record<string, unknown>>().notNull(),
+    actorAccountId: uuid('actor_account_id').notNull(),
+    actorMembershipId: uuid('actor_membership_id').notNull(),
+    requestId: text('request_id').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    foreignKey({
+      columns: [t.tenantId, t.schoolId, t.batchId],
+      foreignColumns: [
+        resultBatches.tenantId,
+        resultBatches.schoolId,
+        resultBatches.id,
+      ],
+      name: 'result_events_batch_fk',
+    }).onDelete('restrict'),
+    foreignKey({
+      columns: [t.tenantId, t.schoolId, t.policyId],
+      foreignColumns: [
+        resultGradingPolicies.tenantId,
+        resultGradingPolicies.schoolId,
+        resultGradingPolicies.id,
+      ],
+      name: 'result_events_policy_fk',
+    }).onDelete('restrict'),
+    foreignKey({
+      columns: [t.tenantId, t.actorMembershipId],
+      foreignColumns: [memberships.tenantId, memberships.id],
+      name: 'result_events_member_fk',
+    }).onDelete('restrict'),
+    foreignKey({
+      columns: [t.actorAccountId, t.actorMembershipId],
+      foreignColumns: [memberships.accountId, memberships.id],
+      name: 'result_events_actor_fk',
+    }).onDelete('restrict'),
+    index('result_events_history_idx').on(
+      t.tenantId,
+      t.schoolId,
+      t.batchId,
+      t.createdAt,
+    ),
+    tenantPolicy(t),
+  ],
+).enableRLS();

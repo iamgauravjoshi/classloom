@@ -171,3 +171,50 @@ export async function completeExam(tx: TenantTransaction, scope: ExamScope, exam
   const [row] = await tx.update(exams).set({ status: 'completed', version: exam.version + 1 }).where(and(whereScope(exams, scope), eq(exams.id, examId))).returning();
   await event(tx, scope, examId, null, 'exam_completed', {}, actor); return row;
 }
+
+/** Results source is serialized with marks/corrections by locking the owning exam first. */
+export async function readResultExamSource(
+  tx: TenantTransaction,
+  scope: ExamScope,
+  examId: string,
+) {
+  const exam = await getExam(tx, scope, examId, true);
+  const assessments = (await listAssessments(tx, scope, examId)).sort((a, b) =>
+    a.id.localeCompare(b.id),
+  );
+  const sheets = await Promise.all(
+    assessments.map(async (a) => ({
+      ...a,
+      marks: await tx
+        .select()
+        .from(examMarks)
+        .where(
+          and(whereScope(examMarks, scope), eq(examMarks.assessmentId, a.id)),
+        )
+        .orderBy(asc(examMarks.id)),
+      corrections: await tx
+        .select()
+        .from(examCorrections)
+        .where(
+          and(
+            whereScope(examCorrections, scope),
+            eq(examCorrections.assessmentId, a.id),
+            eq(examCorrections.status, 'pending'),
+          ),
+        ),
+    })),
+  );
+  return {
+    exam,
+    assessments: sheets,
+    ready:
+      exam.status === 'completed' &&
+      sheets.length > 0 &&
+      sheets.every(
+        (a) =>
+          a.status === 'locked' &&
+          !a.corrections.length &&
+          a.marks.every((m) => m.status !== 'unmarked'),
+      ),
+  };
+}

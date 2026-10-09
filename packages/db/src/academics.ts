@@ -245,3 +245,20 @@ export async function activateAcademicSession(tx: TenantTransaction, scope: Scop
   )).returning();
   return active;
 }
+
+/** Academics contract: school labels frozen in result snapshots. */
+export function listAcademicResultSchools(
+  tx: TenantTransaction,
+  tenantId: string,
+) {
+  return tx
+    .select({
+      id: schools.id,
+      name: schools.name,
+      code: schools.code,
+      timezone: schools.timezone,
+    })
+    .from(schools)
+    .where(eq(schools.tenantId, tenantId))
+    .orderBy(schools.name);
+}

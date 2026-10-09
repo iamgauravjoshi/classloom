@@ -234,6 +234,7 @@ export {
 } from './finance.js';
 export type { FinanceScope, FinanceActor, PaymentAllocation } from './finance.js';
 export * from './examinations.js';
+export type * from './results-contracts.js';
 export {
   AdmissionError,
   nextAdmissionStatus,
@@ -257,3 +258,7 @@ export type {
   AdmissionStatus,
   AdmissionTransitionAction,
 } from './admissions.js';
+export * from './results.js';
+export { resolveResultEnrollments } from './enrollment.js';
+export { readResultStudentIdentities, reportAccessStudentIds } from './students.js';
+export { listAcademicResultSchools } from './academics.js';

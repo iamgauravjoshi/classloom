@@ -107,6 +107,18 @@ function Navigation({ onNavigate }: { onNavigate?: () => void }) {
             (s) => s.canRead || s.canManage || s.canEnter || s.canApprove,
           ),
         },
+        {
+          label: "Results & report cards",
+          href: "/results",
+          icon: GraduationCap,
+          visible: access.results.schools.length > 0,
+        },
+        {
+          label: "My report cards",
+          href: "/report-cards",
+          icon: ClipboardList,
+          visible: access.results.canReadOwn,
+        },
       ],
     },
     {

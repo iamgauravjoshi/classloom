@@ -1,0 +1,1 @@
+ALTER TABLE "result_batches" ADD COLUMN "request_checksum" text DEFAULT '' NOT NULL;
